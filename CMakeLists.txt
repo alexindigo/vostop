@@ -42,6 +42,10 @@ qt_add_executable(vostop
     src/backend/ProcessModel.cpp
     src/backend/ProcFilterProxyModel.h
     src/backend/ProcFilterProxyModel.cpp
+    src/backend/ProcGrouped.h
+    src/backend/ProcGrouped.cpp
+    src/backend/Theme.h
+    src/backend/Theme.cpp
 )
 
 qt_add_qml_module(vostop

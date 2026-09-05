@@ -6,8 +6,8 @@ import Vostop
 Rectangle {
     id: root
 
-    color: "#222222"
-    border.color: "#444444"
+    color: Theme.cardBg
+    border.color: Theme.cardBorder
     radius: 8
 
     function fmtBytes(b) {
@@ -34,7 +34,7 @@ Rectangle {
                 text: qsTr("Network")
                 font.bold: true
                 font.pixelSize: 14
-                color: "#e0e0e0"
+                color: Theme.text
             }
             Item { Layout.fillWidth: true }
             //? iface picker
@@ -56,7 +56,7 @@ Rectangle {
                     ? qsTr("%1 · %2").arg(NetMonitor.iface).arg(NetMonitor.ipv4 || NetMonitor.ipv6 || qsTr("no ip"))
                     : qsTr("%1 · disconnected").arg(NetMonitor.iface))
                 : qsTr("no interfaces")
-            color: "#888888"
+            color: Theme.textFaint
             font.pixelSize: 10
             elide: Text.ElideRight
             Layout.fillWidth: true
@@ -66,14 +66,14 @@ Rectangle {
             Layout.fillWidth: true
             ColumnLayout {
                 spacing: 0
-                Label { text: qsTr("down"); color: "#4fc3f7"; font.pixelSize: 10 }
-                Label { text: root.fmtRate(NetMonitor.downSpeed); color: "#4fc3f7"; font.bold: true; font.pixelSize: 13 }
+                Label { text: qsTr("down"); color: Theme.accentCpu; font.pixelSize: 10 }
+                Label { text: root.fmtRate(NetMonitor.downSpeed); color: Theme.accentCpu; font.bold: true; font.pixelSize: 13 }
             }
             Item { Layout.fillWidth: true }
             ColumnLayout {
                 spacing: 0
-                Label { text: qsTr("up"); color: "#81c784"; font.pixelSize: 10; Layout.alignment: Qt.AlignRight }
-                Label { text: root.fmtRate(NetMonitor.upSpeed); color: "#81c784"; font.bold: true; font.pixelSize: 13; Layout.alignment: Qt.AlignRight }
+                Label { text: qsTr("up"); color: Theme.accentMem; font.pixelSize: 10; Layout.alignment: Qt.AlignRight }
+                Label { text: root.fmtRate(NetMonitor.upSpeed); color: Theme.accentMem; font.bold: true; font.pixelSize: 13; Layout.alignment: Qt.AlignRight }
             }
         }
 
@@ -97,7 +97,7 @@ Rectangle {
             text: qsTr("total %1 ↓ · %2 ↑")
                 .arg(root.fmtBytes(NetMonitor.downTotal))
                 .arg(root.fmtBytes(NetMonitor.upTotal))
-            color: "#888888"
+            color: Theme.textFaint
             font.pixelSize: 10
         }
     }

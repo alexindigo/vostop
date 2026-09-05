@@ -36,8 +36,11 @@ void CpuMonitor::update(const CpuSnapshot& snapshot) {
 		m_usage = snapshot.usage;
 		emit usageChanged();
 	}
-	if (changed(m_perCore, snapshot.perCore)) {
+	if (changed(m_perCore, snapshot.perCore) or changed(m_coreHistories.size(), snapshot.coreHistories.size())) {
 		m_perCore = snapshot.perCore;
+		m_coreHistories.clear();
+		for (const auto& ring : snapshot.coreHistories)
+			m_coreHistories.append(QVariant::fromValue(ring));
 		emit perCoreChanged();
 	}
 	if (changed(m_freqText, snapshot.freqText)) {
@@ -65,8 +68,10 @@ void CpuMonitor::update(const CpuSnapshot& snapshot) {
 		or changed(m_pressure.some[2], snapshot.pressure.some[2])
 		or changed(m_pressure.full[0], snapshot.pressure.full[0])
 		or changed(m_pressure.full[1], snapshot.pressure.full[1])
-		or changed(m_pressure.full[2], snapshot.pressure.full[2])) {
+		or changed(m_pressure.full[2], snapshot.pressure.full[2])
+		or changed(m_pressureHistory, snapshot.pressureHistory)) {
 		m_pressure = snapshot.pressure;
+		m_pressureHistory = snapshot.pressureHistory;
 		emit pressureChanged();
 	}
 	if (changed(m_cpuName, snapshot.cpuName)) {
@@ -124,8 +129,10 @@ void MemMonitor::update(const MemSnapshot& snapshot) {
 		or changed(m_pressure.some[2], snapshot.pressure.some[2])
 		or changed(m_pressure.full[0], snapshot.pressure.full[0])
 		or changed(m_pressure.full[1], snapshot.pressure.full[1])
-		or changed(m_pressure.full[2], snapshot.pressure.full[2])) {
+		or changed(m_pressure.full[2], snapshot.pressure.full[2])
+		or changed(m_pressureHistory, snapshot.pressureHistory)) {
 		m_pressure = snapshot.pressure;
+		m_pressureHistory = snapshot.pressureHistory;
 		emit pressureChanged();
 	}
 }

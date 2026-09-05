@@ -8,8 +8,8 @@ import Vostop
 Rectangle {
     id: root
 
-    color: "#222222"
-    border.color: "#444444"
+    color: Theme.cardBg
+    border.color: Theme.cardBorder
     radius: 8
 
     function fmtBytes(b) {
@@ -34,7 +34,7 @@ Rectangle {
             text: qsTr("Disks")
             font.bold: true
             font.pixelSize: 14
-            color: "#e0e0e0"
+            color: Theme.text
         }
 
         //? Mount rows with usage bars + I/O column
@@ -65,7 +65,7 @@ Rectangle {
                         Layout.fillWidth: true
                         Label {
                             text: mountRow.modelData.name
-                            color: "#dddddd"
+                            color: Theme.textBright
                             font.pixelSize: 11
                             font.bold: true
                             elide: Text.ElideRight
@@ -73,24 +73,24 @@ Rectangle {
                         }
                         Label {
                             text: mountRow.modelData.fstype
-                            color: "#666666"
+                            color: Theme.textGhost
                             font.pixelSize: 9
                         }
                         Item { Layout.fillWidth: true }
                         //? I/O column
                         Label {
                             text: mountRow.modelData.ioWrite > 0 ? "W " + root.fmtRate(mountRow.modelData.ioWrite) : ""
-                            color: "#c9a227"
+                            color: Theme.accentWarn
                             font.pixelSize: 9
                         }
                         Label {
                             text: mountRow.modelData.ioRead > 0 ? "R " + root.fmtRate(mountRow.modelData.ioRead) : ""
-                            color: "#c9a227"
+                            color: Theme.accentWarn
                             font.pixelSize: 9
                         }
                         Label {
                             text: mountRow.modelData.usedPercent + "%"
-                            color: "#aaaaaa"
+                            color: Theme.textDim
                             font.pixelSize: 10
                         }
                     }
@@ -105,7 +105,7 @@ Rectangle {
 
                         background: Rectangle {
                             implicitHeight: 6
-                            color: "#333333"
+                            color: Theme.innerBg
                             radius: 2
                         }
                         contentItem: Item {
@@ -114,8 +114,8 @@ Rectangle {
                                 width: mountRow.modelData.usedPercent / 100 * parent.width
                                 height: parent.height
                                 radius: 2
-                                color: mountRow.modelData.usedPercent > 90 ? "#e57373"
-                                    : mountRow.modelData.usedPercent > 75 ? "#c9a227" : "#81c784"
+                                color: mountRow.modelData.usedPercent > 90 ? Theme.accentDanger
+                                    : mountRow.modelData.usedPercent > 75 ? Theme.accentWarn : Theme.accentMem
                             }
                         }
                     }
@@ -147,7 +147,7 @@ Rectangle {
                     s += qsTr(" · full %1%").arg(DiskMonitor.ioPressureFull[0].toFixed(1))
                 return s
             }
-            color: "#c9a227"
+            color: Theme.accentWarn
             font.pixelSize: 10
         }
     }

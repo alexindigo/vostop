@@ -71,6 +71,7 @@ void DiskMonitor::update(const DiskSnapshot& snapshot) {
 		m_ioPressure.full[2] = snapshot.ioPressureFull[2];
 		m_ioPressure.hasFull = snapshot.ioPressureHasFull;
 		m_ioPressure.valid = snapshot.ioPressureValid;
+		m_ioPressureHistory = snapshot.ioPressureHistory;
 		emit ioPressureChanged();
 	}
 }

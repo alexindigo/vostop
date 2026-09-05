@@ -6,8 +6,8 @@ import Vostop
 Rectangle {
     id: root
 
-    color: "#222222"
-    border.color: "#444444"
+    color: Theme.cardBg
+    border.color: Theme.cardBorder
     radius: 8
 
     ColumnLayout {
@@ -21,14 +21,14 @@ Rectangle {
                 text: qsTr("Temps & Power")
                 font.bold: true
                 font.pixelSize: 14
-                color: "#e0e0e0"
+                color: Theme.text
             }
             Item { Layout.fillWidth: true }
             //? RAPL package watts (when probed)
             Label {
                 visible: SensorsMonitor.cpuWattsAvailable
                 text: SensorsMonitor.cpuWatts.toFixed(1) + " W"
-                color: "#ffb74d"
+                color: Theme.accentHot
                 font.bold: true
                 font.pixelSize: 14
             }
@@ -37,7 +37,7 @@ Rectangle {
         Label {
             visible: !SensorsMonitor.sensorsAvailable
             text: qsTr("no sensors found")
-            color: "#666666"
+            color: Theme.textGhost
             font.pixelSize: 11
         }
 
@@ -46,7 +46,7 @@ Rectangle {
             text: qsTr("cpu %1 °C · %2")
                 .arg(SensorsMonitor.cpuTemp)
                 .arg(SensorsMonitor.cpuSensorName)
-            color: "#ffb74d"
+            color: Theme.accentHot
             font.bold: true
             font.pixelSize: 12
             elide: Text.ElideRight
@@ -67,8 +67,8 @@ Rectangle {
                 Label {
                     required property int index
                     text: index + ": " + SensorsMonitor.coreTemps[index] + "°"
-                    color: SensorsMonitor.coreTemps[index] >= 80 ? "#e57373"
-                        : SensorsMonitor.coreTemps[index] >= 60 ? "#c9a227" : "#aaaaaa"
+                    color: SensorsMonitor.coreTemps[index] >= 80 ? "Theme.accentDanger"
+                        : SensorsMonitor.coreTemps[index] >= 60 ? Theme.accentWarn : "#aaaaaa"
                     font.pixelSize: 9
                 }
             }
@@ -86,7 +86,7 @@ Rectangle {
                 Layout.fillWidth: true
                 Label {
                     text: qsTr("battery %1%").arg(SensorsMonitor.batteryPct)
-                    color: "#81c784"
+                    color: Theme.accentMem
                     font.bold: true
                     font.pixelSize: 12
                 }
@@ -94,7 +94,7 @@ Rectangle {
                 Label {
                     visible: SensorsMonitor.batteryWatts >= 0
                     text: SensorsMonitor.batteryWatts.toFixed(1) + " W"
-                    color: "#aaaaaa"
+                    color: Theme.textDim
                     font.pixelSize: 10
                 }
             }
@@ -107,7 +107,7 @@ Rectangle {
 
                 background: Rectangle {
                     implicitHeight: 7
-                    color: "#333333"
+                    color: Theme.innerBg
                     radius: 3
                 }
                 contentItem: Item {
@@ -116,7 +116,7 @@ Rectangle {
                         width: SensorsMonitor.batteryPct / 100 * parent.width
                         height: parent.height
                         radius: 3
-                        color: SensorsMonitor.batteryPct < 20 ? "#e57373" : "#81c784"
+                        color: SensorsMonitor.batteryPct < 20 ? "Theme.accentDanger" : "#81c784"
                     }
                 }
             }
@@ -126,7 +126,7 @@ Rectangle {
                     + (SensorsMonitor.batterySeconds > 0
                         ? qsTr(" · %1h %2m").arg(Math.floor(SensorsMonitor.batterySeconds / 3600)).arg(Math.floor((SensorsMonitor.batterySeconds % 3600) / 60))
                         : "")
-                color: "#888888"
+                color: Theme.textFaint
                 font.pixelSize: 10
             }
         }
