@@ -13,6 +13,19 @@ qt_policy(SET QTP0001 NEW)
 
 qt_add_executable(vostop
     src/main.cpp
+    src/collect/tools_qt.h
+    src/collect/tools_qt.cpp
+    src/collect/cpu_mem.h
+    src/collect/cpu_mem.cpp
+    src/collect/psi.h
+    src/collect/psi.cpp
+    src/backend/snapshots.h
+    src/backend/Settings.h
+    src/backend/Settings.cpp
+    src/backend/CollectorWorker.h
+    src/backend/CollectorWorker.cpp
+    src/backend/Monitors.h
+    src/backend/Monitors.cpp
 )
 
 qt_add_qml_module(vostop
@@ -31,3 +44,9 @@ qt_add_qml_module(vostop
 )
 
 target_link_libraries(vostop PRIVATE Qt6::Quick)
+
+target_include_directories(vostop PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/backend
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/collect
+)
