@@ -34,6 +34,8 @@ signals:
 	void procUpdated(const ProcSnapshot& snapshot);
 	void procDetailUpdated(const ProcDetailSnapshot& detail);
 	void openFilesUpdated(const OpenFilesSnapshot& openFiles);
+	void diskUpdated(const DiskSnapshot& snapshot);
+	void netUpdated(const NetSnapshot& snapshot);
 
 private slots:
 	void tick();

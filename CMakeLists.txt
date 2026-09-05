@@ -21,6 +21,8 @@ qt_add_executable(vostop
     src/collect/psi.cpp
     src/collect/proc.h
     src/collect/proc.cpp
+    src/collect/disk_net.h
+    src/collect/disk_net.cpp
     src/backend/snapshots.h
     src/backend/Settings.h
     src/backend/Settings.cpp
@@ -28,6 +30,8 @@ qt_add_executable(vostop
     src/backend/CollectorWorker.cpp
     src/backend/Monitors.h
     src/backend/Monitors.cpp
+    src/backend/DiskNetMonitors.h
+    src/backend/DiskNetMonitors.cpp
     src/backend/ProcessModel.h
     src/backend/ProcessModel.cpp
     src/backend/ProcFilterProxyModel.h

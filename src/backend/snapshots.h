@@ -78,3 +78,31 @@ struct OpenFilesSnapshot {
 Q_DECLARE_METATYPE(ProcSnapshot)
 Q_DECLARE_METATYPE(ProcDetailSnapshot)
 Q_DECLARE_METATYPE(OpenFilesSnapshot)
+
+struct DiskSnapshot {
+	struct Mount {
+		QString dev, name, fstype, mountpoint;
+		qint64 total = 0, used = 0, free = 0;
+		int usedPercent = 0, freePercent = 0;
+		qint64 ioRead = 0, ioWrite = 0;   //? last rate sample (bytes/s)
+		int ioActivity = 0;               //? busy % from io_ticks
+	};
+	QList<Mount> mounts;
+	bool ioPressureValid = false;
+	double ioPressureSome[3] = {0.0, 0.0, 0.0};
+	double ioPressureFull[3] = {0.0, 0.0, 0.0};
+	bool ioPressureHasFull = false;
+};
+
+struct NetSnapshot {
+	QString iface;                       //? selected interface
+	QStringList ifaces;                  //? all interfaces
+	QString ipv4, ipv6;
+	bool connected = false;
+	qint64 downSpeed = 0, upSpeed = 0;   //? bytes/s
+	qint64 downTotal = 0, upTotal = 0;
+	QList<double> downHistory;           //? ring, oldest → newest
+	QList<double> upHistory;
+};
+Q_DECLARE_METATYPE(DiskSnapshot)
+Q_DECLARE_METATYPE(NetSnapshot)

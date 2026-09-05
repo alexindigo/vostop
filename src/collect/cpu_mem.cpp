@@ -18,6 +18,7 @@
 #include "cpu_mem.h"
 
 #include "tools_qt.h"
+#include "disk_net.h"
 #include "../backend/Settings.h"
 
 #include <QLoggingCategory>
@@ -690,7 +691,11 @@ namespace Mem {
 		else
 			has_swap = false;
 
-		//? PHASE-4-SEAM: disk section (btop 2424–2741) attaches here in phase 4
+		//? PHASE-4-SEAM: disk section attaches here (stolen btop 2424–2741, vendored in phase 4)
+		Disk::collect(mem.stats.at("swap_total"), mem.stats.at("swap_used"), mem.stats.at("swap_free"),
+					  mem.percent.at("swap_used").empty() ? 0.0 : mem.percent.at("swap_used").back(),
+					  mem.percent.at("swap_free").empty() ? 0.0 : mem.percent.at("swap_free").back(),
+					  has_swap);
 
 		return mem;
 	}

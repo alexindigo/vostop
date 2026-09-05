@@ -5,6 +5,7 @@
 
 #include "../collect/cpu_mem.h"
 #include "../collect/proc.h"
+#include "../collect/disk_net.h"
 #include "Settings.h"
 
 #include <QLoggingCategory>
@@ -146,10 +147,72 @@ void CollectorWorker::tick() {
 		qCWarning(vostopWorker) << "proc collect failed:" << e.what();
 	}
 
+	//? Disk + net snapshots (stolen collectors; Mem::collect() already ran Disk::collect at the seam)
+	DiskSnapshot ds;
+	try {
+		for (const auto& name : Disk::disks_order) {
+			auto it = Disk::disks.find(name);
+			if (it == Disk::disks.end()) continue;
+			const auto& d = it->second;
+			DiskSnapshot::Mount m;
+			m.dev = QString::fromStdString(d.dev.string());
+			m.name = QString::fromStdString(d.name);
+			m.fstype = QString::fromStdString(d.fstype);
+			m.mountpoint = QString::fromStdString(name);
+			m.total = d.total;
+			m.used = d.used;
+			m.free = d.free;
+			m.usedPercent = d.used_percent;
+			m.freePercent = d.free_percent;
+			m.ioRead = d.io_read.empty() ? 0 : d.io_read.back();
+			m.ioWrite = d.io_write.empty() ? 0 : d.io_write.back();
+			m.ioActivity = d.io_activity.empty() ? 0 : static_cast<int>(d.io_activity.back());
+			ds.mounts.append(m);
+		}
+	} catch (const std::exception& e) {
+		qCWarning(vostopWorker) << "disk snapshot failed:" << e.what();
+	}
+
+	NetSnapshot ns;
+	try {
+		auto& net = Net::collect();
+		if (not Net::selected_iface.empty()) {
+			ns.iface = QString::fromStdString(Net::selected_iface);
+			for (const auto& iface : Net::interfaces)
+				ns.ifaces.append(QString::fromStdString(iface));
+			auto& n = net;
+			ns.ipv4 = QString::fromStdString(n.ipv4);
+			ns.ipv6 = QString::fromStdString(n.ipv6);
+			ns.connected = n.connected;
+			ns.downSpeed = static_cast<qint64>(n.stat.at("download").speed);
+			ns.upSpeed = static_cast<qint64>(n.stat.at("upload").speed);
+			ns.downTotal = static_cast<qint64>(n.stat.at("download").total);
+			ns.upTotal = static_cast<qint64>(n.stat.at("upload").total);
+			for (const long long v : n.bandwidth.at("download"))
+				ns.downHistory.append(static_cast<double>(v));
+			for (const long long v : n.bandwidth.at("upload"))
+				ns.upHistory.append(static_cast<double>(v));
+		}
+	} catch (const std::exception& e) {
+		qCWarning(vostopWorker) << "net collect failed:" << e.what();
+	}
+
+	//? Parity: io PSI on the disk card (same psi collector, phase-2 pattern)
+	if (m_psiAvailable) {
+		Psi::Pressure p;
+		if (Psi::read("io", p)) {
+			ds.ioPressureValid = true;
+			for (int i = 0; i < 3; ++i) { ds.ioPressureSome[i] = p.some[i]; ds.ioPressureFull[i] = p.full[i]; }
+			ds.ioPressureHasFull = p.hasFull;
+		}
+	}
+
 	emit cpuUpdated(cs);
 	emit memUpdated(ms);
 	if (not ps.rows.isEmpty())
 		emit procUpdated(ps);
+	emit diskUpdated(ds);
+	emit netUpdated(ns);
 	//? Acceptance diagnostics (phase 3): top-cpu row, category counts, top io writer
 	{
 		int apps = 0, bg = 0, sys = 0;
@@ -171,6 +234,17 @@ void CollectorWorker::tick() {
 		if (topIo)
 			qCDebug(vostopWorker) << "tick: top-io" << topIo->name << "write" << topIo->ioWriteRate / 1048576 << "MiB/s"
 				<< "read" << topIo->ioReadRate / 1048576 << "MiB/s";
+		//? Phase-4 acceptance diagnostics: first mounts + net
+		if (not ds.mounts.isEmpty()) {
+			const auto& m0 = ds.mounts.first();
+			qCDebug(vostopWorker) << "tick: disk" << m0.name << "used" << m0.used / 1073741824 << "GiB /" << m0.total / 1073741824 << "GiB"
+				<< m0.usedPercent << "%" << "mounts" << ds.mounts.size()
+				<< "io W" << m0.ioWrite / 1048576 << "MiB/s R" << m0.ioRead / 1048576 << "MiB/s busy" << m0.ioActivity << "%";
+		} else {
+			qCDebug(vostopWorker) << "tick: disk no mounts";
+		}
+		qCDebug(vostopWorker) << "tick: net iface" << ns.iface << "down" << ns.downSpeed / 1024 << "KiB/s up" << ns.upSpeed / 1024
+			<< "KiB/s ifaces" << ns.ifaces.size();
 	}
 }
 

@@ -39,7 +39,15 @@ QT_END_NAMESPACE
 	X(bool, procFilterKernel, "proc_filter_kernel", false) \
 	X(bool, pauseProcList, "pause_proc_list", false) \
 	X(bool, keepDeadProcUsage, "keep_dead_proc_usage", false) \
-	X(bool, procInfoSmaps, "proc_info_smaps", false)
+	X(bool, procInfoSmaps, "proc_info_smaps", false) \
+	X(QString, disksFilter, "disks_filter", "") \
+	X(bool, diskFreePriv, "disk_free_priv", false) \
+	X(bool, useFstab, "use_fstab", true) \
+	X(bool, onlyPhysical, "only_physical", true) \
+	X(bool, zfsHideDatasets, "zfs_hide_datasets", false) \
+	X(QString, netIface, "net_iface", "") \
+	X(bool, netSync, "net_sync", true) \
+	X(bool, netAuto, "net_auto", true)
 
 class Settings : public QObject {
 	Q_OBJECT
