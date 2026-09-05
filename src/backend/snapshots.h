@@ -63,6 +63,7 @@ struct ProcSnapshot {
 		double ioReadRate = 0.0, ioWriteRate = 0.0;
 		bool ioKnown = false;
 		int category = 1; //? 0 Apps, 1 Background, 2 System
+		double gpuPct = -1.0; //? phase 5: per-process GPU (−1 → "—")
 	};
 	QList<Row> rows;
 	int numpids = 0;      //? stolen accounting: total − filtered
@@ -106,3 +107,37 @@ struct NetSnapshot {
 };
 Q_DECLARE_METATYPE(DiskSnapshot)
 Q_DECLARE_METATYPE(NetSnapshot)
+
+struct GpuSnapshot {
+	struct Device {
+		QString name;
+		double util = 0.0;             //? gpu-totals latest %
+		double memUtil = 0.0;          //? mem_utilization_percent latest
+		quint64 memTotal = 0, memUsed = 0;
+		long long temp = 0, tempMax = 110;
+		long long powerMw = 0, powerMaxMw = 0;   //? milliwatts
+		unsigned clockMhz = 0, memClockMhz = 0;
+		long long encUtil = 0, decUtil = 0;
+		bool approximate = false;      //? fdinfo-aggregate device card (Intel MVP path)
+		QString pdev;
+	};
+	QList<Device> devices;
+	bool available = false;
+};
+
+struct SensorsSnapshot {
+	bool sensorsAvailable = false;
+	QString cpuSensorName;
+	double cpuTemp = 0.0;
+	QList<double> coreTemps;       //? per-core temp (empty when cpu_temp_only)
+	bool batteryAvailable = false;
+	int batteryPct = 0;
+	double batteryWatts = 0.0;
+	long batterySeconds = 0;
+	QString batteryStatus;
+	bool cpuWattsAvailable = false;
+	double cpuWatts = 0.0;
+};
+
+Q_DECLARE_METATYPE(GpuSnapshot)
+Q_DECLARE_METATYPE(SensorsSnapshot)

@@ -47,7 +47,10 @@ QT_END_NAMESPACE
 	X(bool, zfsHideDatasets, "zfs_hide_datasets", false) \
 	X(QString, netIface, "net_iface", "") \
 	X(bool, netSync, "net_sync", true) \
-	X(bool, netAuto, "net_auto", true)
+	X(bool, netAuto, "net_auto", true) \
+	X(QString, shownGpus, "shown_gpus", "Auto") \
+	X(bool, nvmlMeasurePcieSpeeds, "nvml_measure_pcie_speeds", false) \
+	X(bool, rsmiMeasurePcieSpeeds, "rsmi_measure_pcie_speeds", false)
 
 class Settings : public QObject {
 	Q_OBJECT

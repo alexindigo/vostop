@@ -36,6 +36,8 @@ signals:
 	void openFilesUpdated(const OpenFilesSnapshot& openFiles);
 	void diskUpdated(const DiskSnapshot& snapshot);
 	void netUpdated(const NetSnapshot& snapshot);
+	void gpuUpdated(const GpuSnapshot& snapshot);
+	void sensorsUpdated(const SensorsSnapshot& snapshot);
 
 private slots:
 	void tick();
@@ -43,4 +45,5 @@ private slots:
 private:
 	QTimer m_timer;
 	bool m_psiAvailable = false;
+	quint64 m_tickCounter = 0;
 };

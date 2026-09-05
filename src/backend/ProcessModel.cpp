@@ -37,7 +37,8 @@ int ProcessModel::rowCount(const QModelIndex& parent) const {
 }
 
 int ProcessModel::columnCount(const QModelIndex& parent) const {
-	return parent.isValid() ? 0 : ColumnCount;
+	//? GPU column present only when a backend produced per-pid data (phase 5)
+	return parent.isValid() ? 0 : (m_gpuColumnVisible ? ColumnCount : GpuCol);
 }
 
 QVariant ProcessModel::data(const QModelIndex& index, int role) const {
@@ -74,6 +75,7 @@ QVariant ProcessModel::data(const QModelIndex& index, int role) const {
 	case ThreadsCol: return static_cast<qulonglong>(r.threads);
 	case StateCol: return QChar(r.state);
 	case PpidCol: return static_cast<qulonglong>(r.ppid);
+	case GpuCol: return r.gpuPct >= 0.0 ? r.gpuPct : QVariant(); //? "—" via delegate when invalid
 	}
 	return {};
 }
@@ -89,6 +91,7 @@ QVariant ProcessModel::headerData(int section, Qt::Orientation orientation, int 
 	case ThreadsCol: return tr("thr");
 	case StateCol: return tr("state");
 	case PpidCol: return tr("ppid");
+	case GpuCol: return tr("gpu%");
 	}
 	return {};
 }
@@ -164,10 +167,12 @@ void ProcessModel::update(const ProcSnapshot& snapshot) {
 				or current.ppid != incoming.ppid or current.nice != incoming.nice
 				or qFuzzyCompare(current.ioReadRate, incoming.ioReadRate) == false
 				or qFuzzyCompare(current.ioWriteRate, incoming.ioWriteRate) == false
-				or current.ioKnown != incoming.ioKnown or current.category != incoming.category) {
+				or current.ioKnown != incoming.ioKnown or current.category != incoming.category
+				or qFuzzyCompare(current.gpuPct, incoming.gpuPct) == false) {
 				m_rows[oldRow] = incoming;
+				const int cols = columnCount({});
 				const QModelIndex tl = index(oldRow, 0);
-				const QModelIndex br = index(oldRow, ColumnCount - 1);
+				const QModelIndex br = index(oldRow, cols - 1);
 				emit dataChanged(tl, br);
 			}
 		}
@@ -179,6 +184,25 @@ void ProcessModel::update(const ProcSnapshot& snapshot) {
 		m_totalProcs = snapshot.totalProcs;
 		m_threadsTotal = snapshot.threadsTotal;
 		emit totalsChanged();
+	}
+
+	//? GPU column appears only when a backend produced valid per-pid data (phase 5)
+	double topPct = -1.0;
+	for (const auto& r : m_rows)
+		if (r.gpuPct >= 0.0)
+			topPct = std::max(topPct, r.gpuPct);
+	const bool visible = topPct >= 0.0;
+	if (visible != m_gpuColumnVisible) {
+		if (visible)
+			beginInsertColumns(QModelIndex(), GpuCol, GpuCol);
+		else
+			beginRemoveColumns(QModelIndex(), GpuCol, GpuCol);
+		m_gpuColumnVisible = visible;
+		if (visible)
+			endInsertColumns();
+		else
+			endRemoveColumns();
+		emit gpuColumnChanged();
 	}
 }
 

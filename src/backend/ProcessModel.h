@@ -44,6 +44,8 @@ class ProcessModel : public QAbstractTableModel {
 	Q_PROPERTY(QString detailState READ detailState NOTIFY detailChanged FINAL)
 	//? Open files of the selected pid (read on selection, no polling)
 	Q_PROPERTY(QStringList openFiles READ openFiles NOTIFY openFilesChanged FINAL)
+	//? Per-process GPU column appears only when a backend probe succeeded (phase 5)
+	Q_PROPERTY(bool gpuColumnVisible READ gpuColumnVisible NOTIFY gpuColumnChanged FINAL)
 
 public:
 	//* Columns (header + per-column delegates); ppid is a plain column (tree cut)
@@ -55,6 +57,7 @@ public:
 		ThreadsCol,
 		StateCol,
 		PpidCol,
+		GpuCol, //? present only while gpuColumnVisible (dynamic column insert)
 		ColumnCount,
 	};
 	Q_ENUM(Columns)
@@ -74,6 +77,7 @@ public:
 		IoWriteRateRole,
 		IoKnownRole,
 		CategoryRole,
+		GpuPctRole, //? per-process GPU busy% (−1 → "—")
 	};
 	Q_ENUM(Roles)
 
@@ -106,6 +110,7 @@ public:
 	quint64 detailThreads() const { return m_detail.threads; }
 	QString detailState() const { return QChar(m_detail.state); }
 	QStringList openFiles() const { return m_openFiles.files; }
+	bool gpuColumnVisible() const { return m_gpuColumnVisible; }
 
 public slots:
 	void update(const ProcSnapshot& snapshot);
@@ -123,6 +128,7 @@ signals:
 	void selectedPidChanged();
 	void detailChanged();
 	void openFilesChanged();
+	void gpuColumnChanged();
 
 private:
 	QList<ProcSnapshot::Row> m_rows;
@@ -134,4 +140,6 @@ private:
 
 	ProcDetailSnapshot m_detail;
 	OpenFilesSnapshot m_openFiles;
+	bool m_gpuColumnVisible = false;
+	double m_gpuTopPct = -1.0;
 };

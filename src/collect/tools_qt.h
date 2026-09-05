@@ -11,6 +11,7 @@
 #include <QString>
 #include <QStringList>
 #include <algorithm>
+#include <filesystem>
 #include <vector>
 #include <string>
 #include <string_view>
@@ -22,6 +23,9 @@ constexpr std::streamsize SSmax = std::numeric_limits<std::streamsize>::max();
 
 //? Read whole file, strip trailing newline; returns def on any error (btop Tools::readfile semantics)
 std::string readfile(const std::string& path, const std::string& def = "");
+inline std::string readfile(const std::filesystem::path& path, const std::string& def = "") {
+	return readfile(path.string(), def);
+}
 
 //? Split on delim, skipping empty parts (btop Tools::ssplit semantics)
 std::vector<std::string> ssplit(const std::string& str, char delim = ' ');

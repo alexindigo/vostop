@@ -19,6 +19,7 @@
 
 #include "tools_qt.h"
 #include "disk_net.h"
+#include "gpu_sensors.h"
 #include "../backend/Settings.h"
 
 #include <QLoggingCategory>
@@ -105,10 +106,24 @@ namespace Shared {
 			if (not vec.empty() and not v_contains(Cpu::available_fields, field)) Cpu::available_fields.push_back(field);
 		}
 		Cpu::cpuName = Cpu::get_cpuName();
-		Cpu::got_sensors = false; //? phase 5: Cpu::get_sensors()
+		Cpu::got_sensors = Cpu::get_sensors(); //? phase 5: hwmon/coretemp/thermal probe
+		for (const auto& [sensor, ignored] : Cpu::found_sensors) {
+			Cpu::available_sensors.push_back(sensor);
+		}
 		Cpu::core_mapping = Cpu::get_core_mapping();
 
 		Cpu::container_engine = detect_container();
+
+		//? Init for namespace Gpu (btop 393–424; Intel backend cut from MVP — fdinfo approximation covers it)
+		const auto shown_gpus = Settings::getS("shown_gpus");
+		const bool show_all = shown_gpus.isEmpty() or shown_gpus.compare("Auto", Qt::CaseInsensitive) == 0;
+		if (show_all or shown_gpus.contains("nvidia")) {
+			Gpu::Nvml::init();
+		}
+		if (show_all or shown_gpus.contains("amd")) {
+			Gpu::Rsmi::init();
+			Gpu::Asysfs::init(); //? self-skips when rocm-smi already enumerated devices
+		}
 	}
 }
 
@@ -701,20 +716,9 @@ namespace Mem {
 	}
 }
 
-//? PHASE-5: real update_sensors()/get_battery() vendor here (btop 624–647, 835–1030).
-//? Until then: flag-gated no-ops so the phase-2 trigger calls in Cpu::collect() compile.
-namespace Cpu {
-	void update_sensors() {}
-
-	auto get_battery() -> std::tuple<int, float, long, std::string> {
-		has_battery = false; //? no vendor path yet — treat as battery-less until phase 5
-		return {0, 0, 0, ""};
-	}
-}
-
 //? Vendored from src/btop_shared.cpp 38–80 (Cpu::trim_name) — helper state
 namespace Cpu {
-	vector<string> core_sensors; //? filled in phase 5; kept so get_core_mapping compiles against shared decl
+	vector<string> core_sensors;
 	std::tuple<int, float, long, string> current_bat;
 
 	string trim_name(string name) {

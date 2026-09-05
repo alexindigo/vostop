@@ -26,7 +26,6 @@ std::string readfile(const std::string& path, const std::string& def) {
 		data.chop(1);
 	return std::string(data.constData(), static_cast<size_t>(data.size()));
 }
-
 std::vector<std::string> ssplit(const std::string& str, char delim) {
 	const QStringList parts = QString::fromStdString(str).split(QChar::fromLatin1(delim), Qt::SkipEmptyParts);
 	std::vector<std::string> out;

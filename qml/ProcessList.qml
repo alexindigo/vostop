@@ -113,7 +113,10 @@ Rectangle {
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBar {}
 
-            columnWidthProvider: function (col) { return [220, 52, 84, 90, 38, 44, 54][col] }
+            columnWidthProvider: function (col) {
+                const base = [220, 52, 84, 90, 38, 44, 54]
+                return ProcessModel.gpuColumnVisible ? (col === ProcessModel.GpuCol ? 48 : base[col]) : base[col]
+            }
             rowHeightProvider: function (row) { return 22 }
 
             delegate: DelegateChooser {
@@ -304,6 +307,30 @@ Rectangle {
                             x: 4
                             text: cellPpid.model.ppid
                             color: "#888888"
+                            font.pixelSize: 10
+                        }
+                    }
+                }
+                DelegateChoice {
+                    column: ProcessModel.GpuCol
+                    Item {
+                        id: cellGpu
+                        required property var model
+                        required property int index
+                        implicitHeight: 22
+                        Rectangle {
+                            anchors.fill: parent
+                            color: ProcessModel.selectedPid === cellGpu.model.pid
+                                ? "#33404d" : (cellGpu.index % 2 === 0 ? "#222222" : "#262626")
+                        }
+                        MouseArea {
+                            anchors.fill: parent
+                            onClicked: ProcessModel.selectedPid = cellGpu.model.pid
+                        }
+                        Label {
+                            anchors.centerIn: parent
+                            text: cellGpu.model.gpuPct >= 0 ? cellGpu.model.gpuPct.toFixed(1) : "—"
+                            color: "#ce93d8"
                             font.pixelSize: 10
                         }
                     }

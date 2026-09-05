@@ -23,6 +23,10 @@ qt_add_executable(vostop
     src/collect/proc.cpp
     src/collect/disk_net.h
     src/collect/disk_net.cpp
+    src/collect/gpu_sensors.h
+    src/collect/gpu_sensors.cpp
+    src/collect/gpu_procs.h
+    src/collect/gpu_procs.cpp
     src/backend/snapshots.h
     src/backend/Settings.h
     src/backend/Settings.cpp
@@ -32,6 +36,8 @@ qt_add_executable(vostop
     src/backend/Monitors.cpp
     src/backend/DiskNetMonitors.h
     src/backend/DiskNetMonitors.cpp
+    src/backend/GpuSensorsMonitors.h
+    src/backend/GpuSensorsMonitors.cpp
     src/backend/ProcessModel.h
     src/backend/ProcessModel.cpp
     src/backend/ProcFilterProxyModel.h

@@ -6,6 +6,8 @@
 #include "../collect/cpu_mem.h"
 #include "../collect/proc.h"
 #include "../collect/disk_net.h"
+#include "../collect/gpu_sensors.h"
+#include "../collect/gpu_procs.h"
 #include "Settings.h"
 
 #include <QLoggingCategory>
@@ -37,13 +39,29 @@ void CollectorWorker::start() {
 	m_timer.setInterval(Settings::instance()->pollIntervalMs());
 	m_timer.start();
 	tick(); //? first sample immediately (phase-2 warm-up already primed deltas)
+
+	//? Phase 5: flip sensor/battery/watts flags ON wherever backends probed
+	//? successfully (phase-2 decision — the flags were OFF until this phase).
+	//? Queued to the Settings object (GUI thread) to keep the notifier thread-safe.
+	auto* settings = Settings::instance();
+	if (Cpu::got_sensors)
+		QMetaObject::invokeMethod(settings, [settings] { settings->set_checkTemp(true); }, Qt::QueuedConnection);
+	if (Cpu::has_battery) {
+		Cpu::get_battery(); //? probe; sets has_battery=false when no battery conforms
+		if (Cpu::has_battery)
+			QMetaObject::invokeMethod(settings, [settings] { settings->set_showBattery(true); }, Qt::QueuedConnection);
+	}
+	if (Cpu::get_cpuConsumptionUJoules() > 0)
+		QMetaObject::invokeMethod(settings, [settings] { settings->set_showCpuWatts(true); }, Qt::QueuedConnection);
 }
 
 void CollectorWorker::stop() {
 	m_timer.stop();
 }
 
-void CollectorWorker::tick() {
+void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk every 2nd tick)
+	++m_tickCounter;
+
 	CpuSnapshot cs;
 	MemSnapshot ms;
 	try {
@@ -207,12 +225,99 @@ void CollectorWorker::tick() {
 		}
 	}
 
+	//? Phase 5: GPU backends (slow-cadence fdinfo walk every 2nd tick)
+	GpuSnapshot gs;
+	try {
+		auto& gpus = Gpu::collect();
+		for (size_t i = 0; i < gpus.size(); ++i) {
+			const auto& g = gpus[i];
+			GpuSnapshot::Device dev;
+			dev.name = QString::fromStdString(i < Gpu::gpu_names.size() ? Gpu::gpu_names[i] : "GPU " + std::to_string(i));
+			dev.util = g.supported_functions.gpu_utilization and not g.gpu_percent.at("gpu-totals").empty()
+				? static_cast<double>(g.gpu_percent.at("gpu-totals").back()) : -1.0;
+			dev.memUtil = g.mem_utilization_percent.empty() ? -1.0 : static_cast<double>(g.mem_utilization_percent.back());
+			dev.memTotal = g.mem_total;
+			dev.memUsed = g.mem_used;
+			dev.temp = g.temp.empty() ? 0 : g.temp.back();
+			dev.tempMax = g.temp_max;
+			dev.powerMw = g.pwr_usage;
+			dev.powerMaxMw = g.pwr_max_usage;
+			dev.clockMhz = g.gpu_clock_speed;
+			dev.memClockMhz = g.mem_clock_speed;
+			dev.encUtil = g.encoder_utilization;
+			dev.decUtil = g.decoder_utilization;
+			gs.devices.append(dev);
+		}
+	} catch (const std::exception& e) {
+		qCWarning(vostopWorker) << "gpu collect failed:" << e.what();
+	}
+
+	//? Per-process GPU (parity): fdinfo walk on the slow cadence, NVML per-pid fallback
+	QHash<quint64, GpuProcs::ProcGpu> procGpu;
+	try {
+		procGpu = GpuProcs::collect(m_tickCounter % 2 == 0);
+		if (procGpu.isEmpty())
+			procGpu = GpuProcs::nvmlPerPid();
+	} catch (const std::exception& e) {
+		qCDebug(vostopWorker) << "gpu_procs walk failed:" << e.what();
+	}
+
+	//? Intel approximate device card: no real backend found a card, but fdinfo
+	//? clients exist on this machine → device-level aggregate, labeled approximate.
+	if (gs.devices.isEmpty()) {
+		const auto approx = GpuProcs::deviceApprox();
+		for (auto it = approx.constBegin(); it != approx.constEnd(); ++it) {
+			const GpuProcs::DeviceApprox& dev = it.value();
+			GpuSnapshot::Device d;
+			d.name = QStringLiteral("Intel iGPU (approximate, %1)").arg(dev.pdev);
+			d.util = dev.busyPct;
+			d.memUsed = dev.memBytes;
+			d.approximate = true;
+			d.pdev = dev.pdev;
+			gs.devices.append(d);
+		}
+	}
+	gs.available = not gs.devices.isEmpty();
+
+	//? Merge per-pid GPU into the proc snapshot rows (reserved gpuPct role, phase 3)
+	for (auto& row : ps.rows) {
+		if (const auto it = procGpu.constFind(row.pid); it != procGpu.constEnd() and it->valid)
+			row.gpuPct = it->busyPct;
+		else
+			row.gpuPct = -1.0; //? "—" (own-user only; same rule as /proc/<pid>/io)
+	}
+
+	//? Sensors + battery + RAPL watts snapshot
+	SensorsSnapshot ss;
+	ss.sensorsAvailable = Cpu::got_sensors and not Cpu::found_sensors.empty();
+	if (ss.sensorsAvailable) {
+		if (Cpu::found_sensors.contains(Cpu::cpu_sensor))
+			ss.cpuTemp = static_cast<double>(Cpu::found_sensors.at(Cpu::cpu_sensor).temp);
+		ss.cpuSensorName = QString::fromStdString(Cpu::cpu_sensor);
+		for (size_t c = 1; c < Cpu::current_cpu.temp.size() and c <= static_cast<size_t>(Shared::coreCount); ++c) {
+			const auto& dq = Cpu::current_cpu.temp[c];
+			ss.coreTemps.append(dq.empty() ? 0.0 : static_cast<double>(dq.back()));
+		}
+	}
+	ss.batteryAvailable = Cpu::has_battery and Settings::getB("show_battery");
+	if (Cpu::has_battery and Settings::getB("show_battery")) {
+		const auto& [pct, watts, secs, status] = Cpu::current_bat;
+		ss.batteryPct = pct;
+		ss.batteryWatts = watts;
+		ss.batterySeconds = secs;
+		ss.batteryStatus = QString::fromStdString(status);
+	}
+	ss.cpuWattsAvailable = Cpu::supports_watts and Settings::getB("show_cpu_watts");
+	ss.cpuWatts = Cpu::current_cpu.usage_watts;
+
 	emit cpuUpdated(cs);
 	emit memUpdated(ms);
 	if (not ps.rows.isEmpty())
 		emit procUpdated(ps);
 	emit diskUpdated(ds);
 	emit netUpdated(ns);
+	emit gpuUpdated(gs);
+	emit sensorsUpdated(ss);
 	//? Acceptance diagnostics (phase 3): top-cpu row, category counts, top io writer
 	{
 		int apps = 0, bg = 0, sys = 0;
@@ -245,6 +350,20 @@ void CollectorWorker::tick() {
 		}
 		qCDebug(vostopWorker) << "tick: net iface" << ns.iface << "down" << ns.downSpeed / 1024 << "KiB/s up" << ns.upSpeed / 1024
 			<< "KiB/s ifaces" << ns.ifaces.size();
+		//? Phase-5 diagnostics: gpus, sensors, per-pid gpu
+		QString topGpuName;
+		double topGpuPct = -1.0;
+		for (const auto& row : ps.rows)
+			if (row.gpuPct >= 0.0 and row.gpuPct > topGpuPct) {
+				topGpuPct = row.gpuPct;
+				topGpuName = row.name;
+			}
+		qCDebug(vostopWorker) << "tick: gpu devices" << gs.devices.size() << "available" << gs.available
+			<< "procGpu" << procGpu.size() << "drivers" << GpuProcs::drmDrivers().join(u",")
+			<< "top" << topGpuName << topGpuPct << "%";
+		qCDebug(vostopWorker) << "tick: sensors" << ss.sensorsAvailable << "cpuTemp" << ss.cpuTemp
+			<< "cores" << ss.coreTemps.size() << "battery" << ss.batteryAvailable << ss.batteryPct << "%"
+			<< ss.batteryStatus << "watts" << ss.cpuWattsAvailable << ss.cpuWatts;
 	}
 }
 

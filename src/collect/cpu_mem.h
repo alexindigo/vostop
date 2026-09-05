@@ -71,6 +71,8 @@ namespace Cpu {
 	void update_sensors();   //? phase-5 vendor; flag-gated no-op stub until then
 	auto get_battery() -> std::tuple<int, float, long, std::string>; //? phase-5 vendor
 	double system_uptime(); //? stolen Tools::system_uptime
+	long long get_cpuConsumptionUJoules(); //? RAPL probe (btop 1032–1042)
+	float get_cpuConsumptionWatts();       //? RAPL watts (btop 1044–1071)
 }
 
 auto detect_container() -> std::optional<std::string>; //? stolen btop_shared.cpp 313–331
