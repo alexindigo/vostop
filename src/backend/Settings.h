@@ -31,7 +31,15 @@ QT_END_NAMESPACE
 	X(QString, selectedBattery, "selected_battery", "Auto") \
 	X(bool, showCpuWatts, "show_cpu_watts", false) \
 	X(bool, showDisks, "show_disks", true) \
-	X(int, pollIntervalMs, "poll_interval_ms", 1000)
+	X(int, pollIntervalMs, "poll_interval_ms", 1000) \
+	X(QString, procSorting, "proc_sorting", "cpu lazy") \
+	X(bool, procReversed, "proc_reversed", false) \
+	X(QString, procFilter, "proc_filter", "") \
+	X(bool, procPerCore, "proc_per_core", false) \
+	X(bool, procFilterKernel, "proc_filter_kernel", false) \
+	X(bool, pauseProcList, "pause_proc_list", false) \
+	X(bool, keepDeadProcUsage, "keep_dead_proc_usage", false) \
+	X(bool, procInfoSmaps, "proc_info_smaps", false)
 
 class Settings : public QObject {
 	Q_OBJECT

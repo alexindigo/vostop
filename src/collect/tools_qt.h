@@ -10,6 +10,7 @@
 
 #include <QString>
 #include <QStringList>
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <string_view>
@@ -52,6 +53,22 @@ std::string str_to_lower(std::string str);
 std::string capitalize(std::string str);
 std::string trim(const std::string& str, const std::string& whitespace = " \t\r\n");
 std::string s_replace(std::string str, const std::string& from, const std::string& to);
+
+//? Case-insensitive substring search (btop Tools::s_contains_ic)
+inline bool s_contains_ic(const std::string_view str, const std::string_view find_val) {
+	auto it = std::search(
+		str.begin(), str.end(),
+		find_val.begin(), find_val.end(),
+		[](char ch1, char ch2) { return std::toupper(ch1) == std::toupper(ch2); }
+	);
+	return it != str.end();
+}
+
+//? "X days HH:MM:SS" (btop Tools::sec_to_dhms)
+std::string sec_to_dhms(size_t seconds, bool no_days = false, bool no_seconds = false);
+
+//? Base-2 human-readable byte size, e.g. "928 MiB" (btop Tools::floating_humanizer, byte/base-2 path)
+std::string floating_humanizer(uint64_t value, bool per_second = false);
 
 //? Monotonic time in microseconds (btop get_monotonicTimeUSec)
 uint64_t get_monotonicTimeUSec();

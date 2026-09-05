@@ -20,13 +20,20 @@ class CollectorWorker : public QObject {
 public:
 	explicit CollectorWorker(QObject* parent = nullptr);
 
+	//* Process-wide instance (models invoke open-files requests on it)
+	static CollectorWorker* instance();
+
 public slots:
 	void start();   //? invoked via queued connection on the worker thread
 	void stop();
+	void gatherOpenFiles(quint64 pid);
 
 signals:
 	void cpuUpdated(const CpuSnapshot& snapshot);
 	void memUpdated(const MemSnapshot& snapshot);
+	void procUpdated(const ProcSnapshot& snapshot);
+	void procDetailUpdated(const ProcDetailSnapshot& detail);
+	void openFilesUpdated(const OpenFilesSnapshot& openFiles);
 
 private slots:
 	void tick();

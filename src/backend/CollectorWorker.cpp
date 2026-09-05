@@ -4,12 +4,18 @@
 #include "CollectorWorker.h"
 
 #include "../collect/cpu_mem.h"
+#include "../collect/proc.h"
 #include "Settings.h"
 
 #include <QLoggingCategory>
 #include <QThread>
 
 Q_LOGGING_CATEGORY(vostopWorker, "vostop.worker")
+
+CollectorWorker* CollectorWorker::instance() {
+	static CollectorWorker inst;
+	return &inst;
+}
 
 CollectorWorker::CollectorWorker(QObject* parent)
 	: QObject(parent),
@@ -88,10 +94,91 @@ void CollectorWorker::tick() {
 		}
 	}
 
+	//? Stolen proc scan (same worker tick, plan: "same worker thread, same snapshot pattern")
+	ProcSnapshot ps;
+	try {
+		const auto& procs = Proc::collect(false);
+		ps.rows.reserve(static_cast<qsizetype>(procs.size()));
+		ps.totalProcs = static_cast<int>(procs.size());
+		ps.numpids = Proc::numpids.load();
+		quint64 threadsTotal = 0;
+		for (const auto& p : procs) {
+			ProcSnapshot::Row row;
+			row.pid = p.pid;
+			row.name = QString::fromStdString(p.name);
+			row.cmd = QString::fromStdString(p.cmd);
+			row.user = QString::fromStdString(p.user);
+			row.memBytes = p.mem;
+			row.cpuPct = p.cpu_p;
+			row.threads = p.threads;
+			row.state = p.state;
+			row.nice = p.p_nice;
+			row.ppid = p.ppid;
+			//? Parity: per-process disk I/O rates (EACCES → ioKnown=false → "—")
+			row.ioKnown = Proc::io_rates(p.pid, row.ioReadRate, row.ioWriteRate);
+			//? Parity: Apps/Background/System category (cached per pid in the collector)
+			row.category = static_cast<int>(Proc::classify_category(p.pid, p.ppid, p.cpu_s));
+			threadsTotal += p.threads;
+			ps.rows.append(row);
+		}
+		ps.threadsTotal = threadsTotal;
+
+		//? Detail readout for the selected pid (stolen _collect_details)
+		if (Proc::detailed_pid.load() != 0 and not procs.empty()) {
+			ProcDetailSnapshot ds;
+			const auto& e = Proc::detailed.entry;
+			ds.pid = e.pid;
+			ds.name = QString::fromStdString(e.name);
+			ds.user = QString::fromStdString(e.user);
+			ds.status = QString::fromStdString(Proc::detailed.status);
+			ds.elapsed = QString::fromStdString(Proc::detailed.elapsed);
+			ds.parent = QString::fromStdString(Proc::detailed.parent);
+			ds.memBytes = e.mem;
+			ds.cpuPct = e.cpu_p;
+			ds.threads = e.threads;
+			ds.ppid = e.ppid;
+			ds.state = e.state;
+			ds.ioRead = 0; ds.ioWrite = 0; //? raw io shown via model roles; detail pane shows rates
+			ds.valid = true;
+			emit procDetailUpdated(ds);
+		}
+	} catch (const std::exception& e) {
+		qCWarning(vostopWorker) << "proc collect failed:" << e.what();
+	}
+
 	emit cpuUpdated(cs);
 	emit memUpdated(ms);
-	qCDebug(vostopWorker) << "tick: cpu" << cs.usage << "%" << cs.perCore.size() << "cores"
-		<< "mem used" << ms.used / 1048576 << "MiB /" << ms.total / 1048576 << "MiB"
-		<< "swap" << ms.swapUsed / 1048576 << "/" << ms.swapTotal / 1048576
-		<< "psi cpu some" << cs.pressure.some[0] << "mem some" << ms.pressure.some[0];
+	if (not ps.rows.isEmpty())
+		emit procUpdated(ps);
+	//? Acceptance diagnostics (phase 3): top-cpu row, category counts, top io writer
+	{
+		int apps = 0, bg = 0, sys = 0;
+		const ProcSnapshot::Row* top = nullptr;
+		const ProcSnapshot::Row* topIo = nullptr;
+		for (const auto& r : ps.rows) {
+			if (r.category == 0) ++apps; else if (r.category == 1) ++bg; else ++sys;
+			if (not top or r.cpuPct > top->cpuPct) top = &r;
+			if (r.ioKnown and (not topIo or r.ioWriteRate > topIo->ioWriteRate)) topIo = &r;
+		}
+		qCDebug(vostopWorker) << "tick: cpu" << cs.usage << "%" << cs.perCore.size() << "cores"
+			<< "mem used" << ms.used / 1048576 << "MiB /" << ms.total / 1048576 << "MiB"
+			<< "psi cpu some" << cs.pressure.some[0] << "mem some" << ms.pressure.some[0];
+		qCDebug(vostopWorker) << "tick: procs" << ps.rows.size() << "numpids" << ps.numpids
+			<< "threads" << ps.threadsTotal
+			<< "categories apps/bg/sys" << apps << "/" << bg << "/" << sys;
+		if (top)
+			qCDebug(vostopWorker) << "tick: top-cpu" << top->name << top->cpuPct << "%" << "state" << QChar(top->state);
+		if (topIo)
+			qCDebug(vostopWorker) << "tick: top-io" << topIo->name << "write" << topIo->ioWriteRate / 1048576 << "MiB/s"
+				<< "read" << topIo->ioReadRate / 1048576 << "MiB/s";
+	}
+}
+
+void CollectorWorker::gatherOpenFiles(quint64 pid) {
+	OpenFilesSnapshot snap;
+	snap.pid = pid;
+	const auto files = Proc::open_files(pid);
+	for (const auto& f : files)
+		snap.files.append(QString::fromStdString(f));
+	emit openFilesUpdated(snap);
 }
