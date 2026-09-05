@@ -52,6 +52,8 @@ int main(int argc, char *argv[])
     QObject::connect(worker, &CollectorWorker::netUpdated, &netMonitor, &NetMonitor::update);
     QObject::connect(worker, &CollectorWorker::gpuUpdated, &gpuMonitor, &GpuMonitor::update);
     QObject::connect(worker, &CollectorWorker::sensorsUpdated, &sensorsMonitor, &SensorsMonitor::update);
+    //? Phase 6: poll-interval setting applies live (queued into the worker thread)
+    QObject::connect(Settings::instance(), &Settings::pollIntervalMsChanged, worker, &CollectorWorker::applyInterval, Qt::QueuedConnection);
 
     QQmlApplicationEngine engine;
     engine.load(QUrl(QStringLiteral("qrc:/qt/qml/Vostop/qml/Main.qml")));

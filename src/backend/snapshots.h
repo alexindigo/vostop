@@ -17,6 +17,7 @@ struct PressureSnapshot {
 struct CpuSnapshot {
 	int usage = 0;                 //? latest total percent
 	QList<double> perCore;         //? latest percent per core
+	QList<QList<double>> coreHistories; //? per-core rings (oldest → newest) for the grid view
 	double freqMHz = 0.0;          //? parsed from Cpu::cpuHz ("x.xx GHz")
 	QString cpuName;
 	QString freqText;              //? stolen get_cpuHz() string
@@ -24,6 +25,7 @@ struct CpuSnapshot {
 	QList<double> history;         //? total-usage ring, oldest → newest
 	double uptimeSec = 0.0;
 	PressureSnapshot pressure;
+	QList<double> pressureHistory; //? PSI some% ring (phase 6 sparkline)
 };
 
 struct MemSnapshot {
@@ -32,6 +34,7 @@ struct MemSnapshot {
 	QList<double> history;         //? used-percent ring, oldest → newest
 	bool hasSwap = false;
 	PressureSnapshot pressure;
+	QList<double> pressureHistory; //? PSI some% ring (phase 6 sparkline)
 };
 
 Q_DECLARE_METATYPE(CpuSnapshot)
@@ -93,6 +96,7 @@ struct DiskSnapshot {
 	double ioPressureSome[3] = {0.0, 0.0, 0.0};
 	double ioPressureFull[3] = {0.0, 0.0, 0.0};
 	bool ioPressureHasFull = false;
+	QList<double> ioPressureHistory; //? PSI some% ring (phase 6 sparkline)
 };
 
 struct NetSnapshot {

@@ -25,6 +25,8 @@ class CpuMonitor : public QObject {
 	Q_PROPERTY(int usage READ usage NOTIFY usageChanged FINAL)
 	//? Latest percent per logical core
 	Q_PROPERTY(QList<double> perCore READ perCore NOTIFY perCoreChanged FINAL)
+	//? Per-core rings for the grid view (phase 6)
+	Q_PROPERTY(QVariantList coreHistories READ coreHistories NOTIFY perCoreChanged FINAL)
 	//? Stolen get_cpuHz() string, e.g. "3.2 GHz" ("" when unavailable)
 	Q_PROPERTY(QString freqText READ freqText NOTIFY freqTextChanged FINAL)
 	//? 1/5/15-minute load averages
@@ -39,6 +41,7 @@ class CpuMonitor : public QObject {
 	Q_PROPERTY(bool pressureValid READ pressureValid NOTIFY pressureChanged FINAL)
 	Q_PROPERTY(QList<double> pressureSome READ pressureSome NOTIFY pressureChanged FINAL)
 	Q_PROPERTY(QList<double> pressureFull READ pressureFull NOTIFY pressureChanged FINAL)
+	Q_PROPERTY(QList<double> pressureHistory READ pressureHistory NOTIFY pressureChanged FINAL)
 	//? Stolen get_cpuName()
 	Q_PROPERTY(QString cpuName READ cpuName NOTIFY cpuNameChanged FINAL)
 
@@ -52,6 +55,7 @@ public:
 
 	int usage() const { return m_usage; }
 	QList<double> perCore() const { return m_perCore; }
+	QVariantList coreHistories() const { return m_coreHistories; }
 	QString freqText() const { return m_freqText; }
 	double load1() const { return m_load[0]; }
 	double load5() const { return m_load[1]; }
@@ -61,6 +65,7 @@ public:
 	bool pressureValid() const { return m_pressure.valid; }
 	QList<double> pressureSome() const;
 	QList<double> pressureFull() const;
+	QList<double> pressureHistory() const { return m_pressureHistory; }
 	QString cpuName() const { return m_cpuName; }
 
 public slots:
@@ -79,10 +84,12 @@ signals:
 private:
 	int m_usage = 0;
 	QList<double> m_perCore;
+	QVariantList m_coreHistories;
 	QString m_freqText;
 	double m_load[3] = {0.0, 0.0, 0.0};
 	QList<double> m_history;
 	double m_uptimeSec = 0.0;
+	QList<double> m_pressureHistory;
 	PressureSnapshot m_pressure;
 	QString m_cpuName;
 };
@@ -103,6 +110,7 @@ class MemMonitor : public QObject {
 	Q_PROPERTY(bool pressureValid READ pressureValid NOTIFY pressureChanged FINAL)
 	Q_PROPERTY(QList<double> pressureSome READ pressureSome NOTIFY pressureChanged FINAL)
 	Q_PROPERTY(QList<double> pressureFull READ pressureFull NOTIFY pressureChanged FINAL)
+	Q_PROPERTY(QList<double> pressureHistory READ pressureHistory NOTIFY pressureChanged FINAL)
 
 public:
 	explicit MemMonitor(QObject* parent = nullptr);
@@ -124,6 +132,7 @@ public:
 	bool pressureValid() const { return m_pressure.valid; }
 	QList<double> pressureSome() const;
 	QList<double> pressureFull() const;
+	QList<double> pressureHistory() const { return m_pressureHistory; }
 
 public slots:
 	void update(const MemSnapshot& snapshot);
@@ -138,5 +147,6 @@ private:
 	quint64 m_swapTotal = 0, m_swapUsed = 0;
 	bool m_hasSwap = false;
 	QList<double> m_history;
+	QList<double> m_pressureHistory;
 	PressureSnapshot m_pressure;
 };

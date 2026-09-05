@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -6,9 +8,12 @@ import Vostop
 Rectangle {
     id: root
 
-    color: "#222222"
-    border.color: "#444444"
+    color: Theme.cardBg
+    border.color: Theme.cardBorder
     radius: 8
+
+    //? Per-core grid view toggle (Win TM "logical processors" look; phase 6)
+    property bool coreGrid: false
 
     ColumnLayout {
         anchors.fill: parent
@@ -21,14 +26,20 @@ Rectangle {
                 text: qsTr("CPU")
                 font.bold: true
                 font.pixelSize: 14
-                color: "#e0e0e0"
+                color: Theme.text
             }
-            Item { Layout.fillWidth: true }
             Label {
                 text: CpuMonitor.cpuName
-                color: "#888888"
+                color: Theme.textFaint
                 font.pixelSize: 11
                 elide: Text.ElideRight
+            }
+            Item { Layout.fillWidth: true }
+            Button {
+                text: root.coreGrid ? qsTr("graph") : qsTr("cores")
+                font.pixelSize: 9
+                flat: true
+                onClicked: root.coreGrid = !root.coreGrid
             }
         }
 
@@ -38,12 +49,12 @@ Rectangle {
                 text: CpuMonitor.usage + "%"
                 font.pixelSize: 22
                 font.bold: true
-                color: "#4fc3f7"
+                color: Theme.accentCpu
             }
             Item { Layout.fillWidth: true }
             Label {
                 text: CpuMonitor.freqText
-                color: "#aaaaaa"
+                color: Theme.textDim
                 font.pixelSize: 12
             }
         }
@@ -53,52 +64,91 @@ Rectangle {
             Layout.fillHeight: true
             samples: CpuMonitor.history
             maxValue: 100.0
-            lineColor: "#4fc3f7"
+            lineColor: Theme.accentCpu
         }
 
-        //? Per-core bars (stolen per-core math; bars match `nproc`)
-        GridLayout {
+        //? Per-core presentation: bars (default) or Win-TM-style mini-graph grid
+        StackLayout {
+            id: coreStack
             Layout.fillWidth: true
-            columns: 4
-            columnSpacing: 4
-            rowSpacing: 3
+            currentIndex: root.coreGrid ? 1 : 0
 
-            Repeater {
-                model: CpuMonitor.perCore.length
+            GridLayout {
+                columns: 4
+                columnSpacing: 4
+                rowSpacing: 3
 
-                ColumnLayout {
-                    id: coreCell
-                    required property int index
+                Repeater {
+                    model: CpuMonitor.perCore.length
 
-                    spacing: 1
+                    ColumnLayout {
+                        id: coreCell
+                        required property int index
+                        spacing: 1
 
-                    ProgressBar {
-                        id: coreBar
-                        Layout.fillWidth: true
-                        from: 0
-                        to: 100
-                        value: CpuMonitor.perCore[coreCell.index] ?? 0
+                        ProgressBar {
+                            id: coreBar
+                            Layout.fillWidth: true
+                            from: 0
+                            to: 100
+                            value: CpuMonitor.perCore[coreCell.index] ?? 0
 
-                        background: Rectangle {
-                            implicitHeight: 5
-                            color: "#333333"
-                            radius: 2
-                        }
-                        contentItem: Item {
-                            implicitHeight: 5
-                            Rectangle {
-                                width: coreBar.visualPosition * parent.width
-                                height: parent.height
+                            background: Rectangle {
+                                implicitHeight: 5
+                                color: Theme.innerBg
                                 radius: 2
-                                color: "#4fc3f7"
+                            }
+                            contentItem: Item {
+                                implicitHeight: 5
+                                Rectangle {
+                                    width: coreBar.visualPosition * parent.width
+                                    height: parent.height
+                                    radius: 2
+                                    color: Theme.accentCpu
+                                }
                             }
                         }
+                        Label {
+                            text: coreCell.index
+                            font.pixelSize: 8
+                            color: Theme.textGhost
+                            Layout.alignment: Qt.AlignHCenter
+                        }
                     }
-                    Label {
-                        text: coreCell.index
-                        font.pixelSize: 8
-                        color: "#666666"
-                        Layout.alignment: Qt.AlignHCenter
+                }
+            }
+
+            GridLayout {
+                columns: 6
+                columnSpacing: 3
+                rowSpacing: 3
+
+                Repeater {
+                    model: CpuMonitor.coreHistories.length
+
+                    ColumnLayout {
+                        id: coreGraphCell
+                        required property int index
+                        required property var modelData
+                        spacing: 0
+
+                        HistoryGraph {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 30
+                            samples: {
+                                const ring = CpuMonitor.coreHistories[coreGraphCell.index]
+                                return ring ? ring : []
+                            }
+                            maxValue: 100.0
+                            lineColor: Theme.accentCpu
+                            gridDivisions: 0
+                        }
+                        Label {
+                            text: coreGraphCell.index
+                            font.pixelSize: 7
+                            color: Theme.textGhost
+                            Layout.alignment: Qt.AlignHCenter
+                        }
                     }
                 }
             }
@@ -111,24 +161,36 @@ Rectangle {
                 .arg(CpuMonitor.load5.toFixed(2))
                 .arg(CpuMonitor.load15.toFixed(2))
                 .arg(root.formatUptime(CpuMonitor.uptimeSec))
-            color: "#888888"
+            color: Theme.textFaint
             font.pixelSize: 10
         }
 
-        //? PSI pressure sub-line (parity addition; hidden when PSI absent)
-        Label {
+        //? PSI pressure: sub-line + sparkline (phase 6 styling); hidden when PSI absent
+        RowLayout {
             visible: CpuMonitor.pressureValid
             Layout.fillWidth: true
-            text: {
-                if (!visible)
-                    return ""
-                let s = qsTr("psi some %1%").arg(CpuMonitor.pressureSome[0].toFixed(1))
-                if (CpuMonitor.pressureFull.length > 0 && CpuMonitor.pressureFull[0] > 0)
-                    s += qsTr(" · full %1%").arg(CpuMonitor.pressureFull[0].toFixed(1))
-                return s
+            spacing: 6
+            Label {
+                text: {
+                    if (!visible)
+                        return ""
+                    let s = qsTr("psi some %1%").arg(CpuMonitor.pressureSome[0].toFixed(1))
+                    if (CpuMonitor.pressureFull.length > 0 && CpuMonitor.pressureFull[0] > 0)
+                        s += qsTr(" · full %1%").arg(CpuMonitor.pressureFull[0].toFixed(1))
+                    return s
+                }
+                color: CpuMonitor.pressureSome[0] > 30 ? Theme.accentDanger : Theme.accentWarn
+                font.pixelSize: 10
             }
-            color: "#c9a227"
-            font.pixelSize: 10
+            HistoryGraph {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 16
+                visible: CpuMonitor.pressureHistory.length > 1
+                samples: CpuMonitor.pressureHistory
+                maxValue: 100.0
+                lineColor: CpuMonitor.pressureSome[0] > 30 ? Theme.accentDanger : Theme.accentWarn
+                gridDivisions: 0
+            }
         }
     }
 

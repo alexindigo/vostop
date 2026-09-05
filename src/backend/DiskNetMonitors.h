@@ -26,6 +26,7 @@ class DiskMonitor : public QObject {
 	Q_PROPERTY(bool ioPressureValid READ ioPressureValid NOTIFY ioPressureChanged FINAL)
 	Q_PROPERTY(QList<double> ioPressureSome READ ioPressureSome NOTIFY ioPressureChanged FINAL)
 	Q_PROPERTY(QList<double> ioPressureFull READ ioPressureFull NOTIFY ioPressureChanged FINAL)
+	Q_PROPERTY(QList<double> ioPressureHistory READ ioPressureHistory NOTIFY ioPressureChanged FINAL)
 
 public:
 	explicit DiskMonitor(QObject* parent = nullptr);
@@ -37,6 +38,7 @@ public:
 	bool ioPressureValid() const { return m_ioPressure.valid; }
 	QList<double> ioPressureSome() const;
 	QList<double> ioPressureFull() const;
+	QList<double> ioPressureHistory() const { return m_ioPressureHistory; }
 
 public slots:
 	void update(const DiskSnapshot& snapshot);
@@ -47,6 +49,7 @@ signals:
 
 private:
 	QVariantList m_mounts;
+	QList<double> m_ioPressureHistory;
 	PressureSnapshot m_ioPressure;
 };
 

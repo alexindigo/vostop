@@ -114,7 +114,6 @@ QHash<quint64, ProcGpu> collect(bool newTick) {
 			if (not hasDrm) continue;
 			pit = pid_cache.emplace(pid, PidState{}).first;
 			pit->second.hasDrm = true;
-			qCDebug(vostopCollect) << "gpu_procs: pid" << pid << "holds DRM fds";
 		}
 
 		PidState& st = pit->second;
@@ -157,7 +156,6 @@ QHash<quint64, ProcGpu> collect(bool newTick) {
 		if (clients.isEmpty()) {
 			//? DRM fds closed since the pre-check
 			st.hasDrm = false;
-			qCDebug(vostopCollect) << "gpu_procs: pid" << pid << "no fdinfo clients found";
 			continue;
 		}
 

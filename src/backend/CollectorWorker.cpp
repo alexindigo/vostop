@@ -10,6 +10,7 @@
 #include "../collect/gpu_procs.h"
 #include "Settings.h"
 
+#include <QElapsedTimer>
 #include <QLoggingCategory>
 #include <QThread>
 
@@ -59,8 +60,15 @@ void CollectorWorker::stop() {
 	m_timer.stop();
 }
 
+void CollectorWorker::applyInterval() {
+	m_timer.setInterval(Settings::instance()->pollIntervalMs());
+}
+
 void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk every 2nd tick)
 	++m_tickCounter;
+	QElapsedTimer tickTimer;
+	tickTimer.start();
+	tickTimer.start();
 
 	CpuSnapshot cs;
 	MemSnapshot ms;
@@ -77,6 +85,14 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 		cs.loadAvg[2] = cpu.load_avg[2];
 		for (const long long v : cpu.cpu_percent.at("total"))
 			cs.history.append(static_cast<double>(v));
+		//? Phase 6: per-core rings for the Win-TM-style grid view
+		for (const auto& core : cpu.core_percent) {
+			QList<double> ring;
+			ring.reserve(core.size());
+			for (const long long v : core)
+				ring.append(static_cast<double>(v));
+			cs.coreHistories.append(ring);
+		}
 		try {
 			cs.uptimeSec = Cpu::system_uptime();
 		} catch (const std::exception&) {}
@@ -105,16 +121,22 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 			cs.pressure.valid = true;
 			for (int i = 0; i < 3; ++i) { cs.pressure.some[i] = p.some[i]; cs.pressure.full[i] = p.full[i]; }
 			cs.pressure.hasFull = p.hasFull;
+			cs.pressureHistory.append(p.some[0]);
+			if (cs.pressureHistory.size() > VostopHistoryDepth) cs.pressureHistory.removeFirst();
 		}
 		if (Psi::read("memory", p)) {
 			ms.pressure.valid = true;
 			for (int i = 0; i < 3; ++i) { ms.pressure.some[i] = p.some[i]; ms.pressure.full[i] = p.full[i]; }
 			ms.pressure.hasFull = p.hasFull;
+			ms.pressureHistory.append(p.some[0]);
+			if (ms.pressureHistory.size() > VostopHistoryDepth) ms.pressureHistory.removeFirst();
 		}
 	}
 
 	//? Stolen proc scan (same worker tick, plan: "same worker thread, same snapshot pattern")
 	ProcSnapshot ps;
+	QElapsedTimer procTimer;
+	procTimer.start();
 	try {
 		const auto& procs = Proc::collect(false);
 		ps.rows.reserve(static_cast<qsizetype>(procs.size()));
@@ -141,6 +163,8 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 			ps.rows.append(row);
 		}
 		ps.threadsTotal = threadsTotal;
+		m_procScanMs = m_procScanMs == 0.0 ? procTimer.elapsed()
+			: 0.9 * m_procScanMs + 0.1 * procTimer.elapsed();
 
 		//? Detail readout for the selected pid (stolen _collect_details)
 		if (Proc::detailed_pid.load() != 0 and not procs.empty()) {
@@ -191,6 +215,18 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 		qCWarning(vostopWorker) << "disk snapshot failed:" << e.what();
 	}
 
+	//? Parity: io PSI on the disk card (same psi collector; phase-6 sparkline ring)
+	if (m_psiAvailable) {
+		Psi::Pressure p;
+		if (Psi::read("io", p)) {
+			ds.ioPressureValid = true;
+			for (int i = 0; i < 3; ++i) { ds.ioPressureSome[i] = p.some[i]; ds.ioPressureFull[i] = p.full[i]; }
+			ds.ioPressureHasFull = p.hasFull;
+			ds.ioPressureHistory.append(p.some[0]);
+			if (ds.ioPressureHistory.size() > VostopHistoryDepth) ds.ioPressureHistory.removeFirst();
+		}
+	}
+
 	NetSnapshot ns;
 	try {
 		auto& net = Net::collect();
@@ -215,18 +251,11 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 		qCWarning(vostopWorker) << "net collect failed:" << e.what();
 	}
 
-	//? Parity: io PSI on the disk card (same psi collector, phase-2 pattern)
-	if (m_psiAvailable) {
-		Psi::Pressure p;
-		if (Psi::read("io", p)) {
-			ds.ioPressureValid = true;
-			for (int i = 0; i < 3; ++i) { ds.ioPressureSome[i] = p.some[i]; ds.ioPressureFull[i] = p.full[i]; }
-			ds.ioPressureHasFull = p.hasFull;
-		}
-	}
-
 	//? Phase 5: GPU backends (slow-cadence fdinfo walk every 2nd tick)
 	GpuSnapshot gs;
+	QElapsedTimer fdinfoTimer;
+	fdinfoTimer.start();
+	bool fdinfoRan = false;
 	try {
 		auto& gpus = Gpu::collect();
 		for (size_t i = 0; i < gpus.size(); ++i) {
@@ -258,9 +287,13 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 		procGpu = GpuProcs::collect(m_tickCounter % 2 == 0);
 		if (procGpu.isEmpty())
 			procGpu = GpuProcs::nvmlPerPid();
+		fdinfoRan = true;
 	} catch (const std::exception& e) {
 		qCDebug(vostopWorker) << "gpu_procs walk failed:" << e.what();
 	}
+	if (fdinfoRan)
+		m_fdinfoMs = m_fdinfoMs == 0.0 ? fdinfoTimer.elapsed()
+			: 0.9 * m_fdinfoMs + 0.1 * fdinfoTimer.elapsed();
 
 	//? Intel approximate device card: no real backend found a card, but fdinfo
 	//? clients exist on this machine → device-level aggregate, labeled approximate.
@@ -364,6 +397,9 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 		qCDebug(vostopWorker) << "tick: sensors" << ss.sensorsAvailable << "cpuTemp" << ss.cpuTemp
 			<< "cores" << ss.coreTemps.size() << "battery" << ss.batteryAvailable << ss.batteryPct << "%"
 			<< ss.batteryStatus << "watts" << ss.cpuWattsAvailable << ss.cpuWatts;
+		//? Phase-6 perf gate: per-pid io + fdinfo overhead (post-MVP perf pass input)
+		qCDebug(vostopWorker) << "tick: ms total" << tickTimer.elapsed()
+			<< "| proc scan" << procTimer.elapsed() << "| fdinfo walk" << (m_tickCounter % 2 == 0 ? fdinfoTimer.elapsed() : -1);
 	}
 }
 
