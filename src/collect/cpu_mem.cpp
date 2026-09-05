@@ -52,6 +52,7 @@ using std::string, std::vector;
 
 namespace Shared {
 	fs::path procPath;
+	fs::path passwd_path;
 	long pageSize = 0, clkTck = 0, coreCount = 0;
 
 	void init() {
@@ -59,6 +60,10 @@ namespace Shared {
 		procPath = (fs::is_directory(fs::path("/proc")) and access("/proc", R_OK) != -1) ? "/proc" : "";
 		if (procPath.empty())
 			throw std::runtime_error("Proc filesystem not found or no permission to read from it!");
+
+		passwd_path = (fs::is_regular_file(fs::path("/etc/passwd")) and access("/etc/passwd", R_OK) != -1) ? "/etc/passwd" : "";
+		if (passwd_path.empty())
+			qCWarning(vostopCollect) << "Could not read /etc/passwd, will show UID instead of username.";
 
 		coreCount = sysconf(_SC_NPROCESSORS_ONLN);
 		if (coreCount < 1) {

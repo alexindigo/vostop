@@ -36,3 +36,45 @@ struct MemSnapshot {
 
 Q_DECLARE_METATYPE(CpuSnapshot)
 Q_DECLARE_METATYPE(MemSnapshot)
+
+struct ProcDetailSnapshot {
+	quint64 pid = 0;
+	QString name, user, status, elapsed, parent;
+	quint64 memBytes = 0;
+	double cpuPct = 0.0;
+	quint64 threads = 0;
+	quint64 ppid = 0;
+	char state = '0';
+	quint64 ioRead = 0, ioWrite = 0; //? cumulative bytes
+	bool valid = false;
+};
+
+struct ProcSnapshot {
+	struct Row {
+		quint64 pid = 0;
+		QString name, cmd, user;
+		quint64 memBytes = 0;
+		double cpuPct = 0.0;
+		quint64 threads = 0;
+		char state = '0';
+		qint64 nice = 0;
+		quint64 ppid = 0;
+		//? Parity additions
+		double ioReadRate = 0.0, ioWriteRate = 0.0;
+		bool ioKnown = false;
+		int category = 1; //? 0 Apps, 1 Background, 2 System
+	};
+	QList<Row> rows;
+	int numpids = 0;      //? stolen accounting: total − filtered
+	int totalProcs = 0;   //? all scanned processes
+	quint64 threadsTotal = 0;
+};
+
+struct OpenFilesSnapshot {
+	quint64 pid = 0;
+	QStringList files;
+};
+
+Q_DECLARE_METATYPE(ProcSnapshot)
+Q_DECLARE_METATYPE(ProcDetailSnapshot)
+Q_DECLARE_METATYPE(OpenFilesSnapshot)

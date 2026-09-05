@@ -26,6 +26,7 @@ inline constexpr int VostopHistoryDepth = 120;
 
 namespace Shared {
 	extern std::filesystem::path procPath;
+	extern std::filesystem::path passwd_path;
 	extern long pageSize, clkTck, coreCount;
 
 	//* Naturalized init: coreCount/pageSize/clkTck/procPath, cpufreq paths,

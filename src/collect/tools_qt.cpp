@@ -12,6 +12,7 @@
 #include <charconv>
 #include <chrono>
 #include <limits>
+#include <utility>
 
 namespace tools {
 
@@ -71,6 +72,36 @@ uint64_t get_monotonicTimeUSec() {
 	return static_cast<uint64_t>(
 		std::chrono::duration_cast<std::chrono::microseconds>(
 			std::chrono::steady_clock::now().time_since_epoch()).count());
+}
+
+std::string sec_to_dhms(size_t seconds, bool no_days, bool no_seconds) {
+	size_t days = seconds / 86400; seconds %= 86400;
+	size_t hours = seconds / 3600; seconds %= 3600;
+	size_t minutes = seconds / 60; seconds %= 60;
+	std::string out = (not no_days and days > 0 ? std::to_string(days) + "d " : "")
+				+ (hours < 10 ? "0" : "") + std::to_string(hours) + ':'
+				+ (minutes < 10 ? "0" : "") + std::to_string(minutes)
+				+ (not no_seconds ? ":" + std::string(std::cmp_less(seconds, 10) ? "0" : "") + std::to_string(seconds) : "");
+	return out;
+}
+
+std::string floating_humanizer(uint64_t value, bool per_second) {
+	static const char* units[] = { "Byte", "KiB", "MiB", "GiB", "TiB", "PiB" };
+	double v = static_cast<double>(value);
+	size_t unit = 0;
+	while (v >= 1024.0 and unit < 5) {
+		v /= 1024.0;
+		++unit;
+	}
+	QString out;
+	if (unit == 0)
+		out = QString::number(static_cast<qulonglong>(value));
+	else
+		out = QString::number(v, 'f', 1);
+	out += u' ' + QString::fromLatin1(units[unit]);
+	if (per_second)
+		out += "/s";
+	return sstr(out);
 }
 
 } // namespace tools

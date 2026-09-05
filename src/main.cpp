@@ -6,6 +6,7 @@
 #include "backend/snapshots.h"
 #include "backend/CollectorWorker.h"
 #include "backend/Monitors.h"
+#include "backend/ProcessModel.h"
 #include "backend/Settings.h"
 
 Q_LOGGING_CATEGORY(vostop, "vostop")
@@ -18,9 +19,13 @@ int main(int argc, char *argv[])
 
     qRegisterMetaType<CpuSnapshot>("CpuSnapshot");
     qRegisterMetaType<MemSnapshot>("MemSnapshot");
+    qRegisterMetaType<ProcSnapshot>("ProcSnapshot");
+    qRegisterMetaType<ProcDetailSnapshot>("ProcDetailSnapshot");
+    qRegisterMetaType<OpenFilesSnapshot>("OpenFilesSnapshot");
 
     CpuMonitor& cpuMonitor = CpuMonitor::instance();
     MemMonitor& memMonitor = MemMonitor::instance();
+    ProcessModel& procModel = ProcessModel::instance();
 
     QThread collectorThread;
     CollectorWorker* worker = new CollectorWorker;
@@ -30,6 +35,9 @@ int main(int argc, char *argv[])
     //? Queued (auto) connections: worker emits from the worker thread → GUI-thread monitors
     QObject::connect(worker, &CollectorWorker::cpuUpdated, &cpuMonitor, &CpuMonitor::update);
     QObject::connect(worker, &CollectorWorker::memUpdated, &memMonitor, &MemMonitor::update);
+    QObject::connect(worker, &CollectorWorker::procUpdated, &procModel, &ProcessModel::update);
+    QObject::connect(worker, &CollectorWorker::procDetailUpdated, &procModel, &ProcessModel::detailUpdated);
+    QObject::connect(worker, &CollectorWorker::openFilesUpdated, &procModel, &ProcessModel::openFilesUpdated);
 
     QQmlApplicationEngine engine;
     engine.load(QUrl(QStringLiteral("qrc:/qt/qml/Vostop/qml/Main.qml")));
