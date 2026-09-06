@@ -54,7 +54,9 @@ QT_END_NAMESPACE
 	X(QString, theme, "theme", "dark") \
 	X(bool, groupCollapsedApps, "group_collapsed_apps", false) \
 	X(bool, groupCollapsedBackground, "group_collapsed_background", false) \
-	X(bool, groupCollapsedSystem, "group_collapsed_system", false)
+	X(bool, groupCollapsedSystem, "group_collapsed_system", false) \
+	X(bool, procIoReads, "proc_io_reads", true) \
+	X(bool, gpuFdinfoWalk, "gpu_fdinfo_walk", true)
 
 class Settings : public QObject {
 	Q_OBJECT
