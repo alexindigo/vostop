@@ -6,7 +6,8 @@ import QtQuick.Layouts
 import Vostop
 
 //? Panel wrapper: file-Loader for one panel + error tile on load/creation
-//? failure (spec §3 — never a crash). panelTitle passthrough is unused
+//? failure (spec §3 — tiles cover load/creation failure; post-load exceptions
+//? surface via the engine log). panelTitle passthrough is unused
 //? visually in v1 view mode (edit-mode chrome later).
 Item {
     id: root
