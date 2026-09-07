@@ -18,9 +18,10 @@ ProcCategoryProxy::ProcCategoryProxy(QObject* parent)
 void ProcCategoryProxy::setCategory(int category) {
 	if (m_category == category)
 		return;
+	beginFilterChange();
 	m_category = category;
 	emit categoryChanged();
-	invalidateFilter();
+	endFilterChange(QSortFilterProxyModel::Direction::Rows);
 }
 
 void ProcCategoryProxy::setSectionFilter(const QString& filter) {
