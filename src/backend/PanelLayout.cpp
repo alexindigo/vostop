@@ -91,6 +91,15 @@ QVariantMap PanelLayout::errorNode(const QString& msg) const {
 	QVariantMap m;
 	m[QStringLiteral("_invalid")] = true;
 	m[QStringLiteral("_error")] = msg;
+	//? Same default field set a sanitized node carries, so the QML delegate
+	//? treats an invalid node like a default panel slot — otherwise nested
+	//? error tiles get fillWidth: false + preferredWidth: 0 and collapse to
+	//? zero size (invisible)
+	m[QStringLiteral("direction")] = QStringLiteral("rows");
+	m[QStringLiteral("gap")] = 0;
+	m[QStringLiteral("grow")] = 1;
+	m[QStringLiteral("minWidth")] = 0;
+	m[QStringLiteral("minHeight")] = 0;
 	return m;
 }
 
