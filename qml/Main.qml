@@ -61,27 +61,11 @@ ApplicationWindow {
             }
         }
 
-        GridLayout {
+        PanelLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.margins: 8
             Layout.topMargin: 0
-            columns: 3
-            rowSpacing: 8
-            columnSpacing: 8
-
-            CpuCard { Layout.fillWidth: true; Layout.fillHeight: true }
-            MemCard { Layout.fillWidth: true; Layout.fillHeight: true }
-            DiskCard { Layout.fillWidth: true; Layout.fillHeight: true }
-            NetCard { Layout.fillWidth: true; Layout.fillHeight: true }
-            GpuCard { Layout.fillWidth: true; Layout.fillHeight: true }
-            TempCard { Layout.fillWidth: true; Layout.fillHeight: true }
-            ProcessList {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.columnSpan: 3
-                Layout.minimumHeight: 320
-            }
         }
     }
 

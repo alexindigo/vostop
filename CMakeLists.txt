@@ -10,6 +10,7 @@ find_package(Qt6 REQUIRED COMPONENTS Quick)
 qt_standard_project_setup()
 
 qt_policy(SET QTP0001 NEW)
+qt_policy(SET QTP0004 NEW)
 
 qt_add_executable(vostop
     src/main.cpp
@@ -46,24 +47,29 @@ qt_add_executable(vostop
     src/backend/ProcGrouped.cpp
     src/backend/Theme.h
     src/backend/Theme.cpp
+    src/backend/PanelLayout.h
+    src/backend/PanelLayout.cpp
 )
+
+set(VOSTOP_PANELS_DIR "${CMAKE_INSTALL_PREFIX}/share/vostop/panels" CACHE STRING "Directory for built-in panels")
 
 qt_add_qml_module(vostop
     URI Vostop
     VERSION 1.0
     QML_FILES
         qml/Main.qml
-        qml/CpuCard.qml
-        qml/MemCard.qml
-        qml/DiskCard.qml
-        qml/NetCard.qml
-        qml/ProcessList.qml
-        qml/GpuCard.qml
-        qml/TempCard.qml
+        qml/PanelLayout.qml
+        qml/VostopPanel.qml
         qml/HistoryGraph.qml
 )
 
 target_link_libraries(vostop PRIVATE Qt6::Quick)
+
+target_compile_definitions(vostop PRIVATE VOSTOP_PANELS_DIR="${VOSTOP_PANELS_DIR}")
+
+include(GNUInstallDirs)
+install(TARGETS vostop RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(DIRECTORY panels/ DESTINATION share/vostop/panels FILES_MATCHING PATTERN "*.qml")
 
 target_include_directories(vostop PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
