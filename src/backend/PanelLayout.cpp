@@ -16,6 +16,7 @@
 #include <QJsonParseError>
 #include <QLoggingCategory>
 #include <QQmlEngine>
+#include <QRegularExpression>
 #include <QStandardPaths>
 
 Q_LOGGING_CATEGORY(vostopPanels, "vostop.panels")
@@ -43,9 +44,47 @@ PanelLayout::PanelLayout(QObject* parent)
 	const QString configBase = QStandardPaths::writableLocation(QStandardPaths::ConfigLocation);
 	m_configDir = configBase + QStringLiteral("/vostop");
 	m_configFile = m_configDir + QStringLiteral("/layout.json");
+	m_userDir = m_configDir + QStringLiteral("/panels");
+
+	//? User panels dir created on startup if absent (spec §3)
+	QDir().mkpath(m_configDir);
+	QDir().mkpath(m_userDir);
 
 	load();
 	setupWatcher();
+}
+
+//? One Loader path for user panels and built-ins: user dir shadows built-ins
+//? by design; `..`/separators rejected before resolution; the resolved
+//? canonical path must stay under one of the two roots (spec §3)
+QString PanelLayout::resolveSource(const QString& name) const {
+	static const QRegularExpression identifier(QStringLiteral("^[A-Za-z0-9_-]+$"));
+	if (!identifier.match(name).hasMatch()) {
+		qCWarning(vostopPanels) << "panel source rejected (not identifier-only):" << name;
+		return {};
+	}
+	const QString file = name + QStringLiteral(".qml");
+
+	auto resolveUnder = [](const QString& root, const QString& rel) -> QString {
+		const QFileInfo rootInfo(root);
+		const QString rootCanon = rootInfo.canonicalFilePath();
+		if (rootCanon.isEmpty())
+			return {};
+		const QFileInfo fi(rootCanon + QLatin1Char('/') + rel);
+		if (!fi.isFile())
+			return {};
+		const QString canon = fi.canonicalFilePath();
+		if (canon.isEmpty() || !canon.startsWith(rootCanon + QLatin1Char('/')))
+			return {};
+		return canon;
+	};
+
+	QString path = resolveUnder(m_userDir, file);
+	if (path.isEmpty())
+		path = resolveUnder(m_builtInDir, file);
+	if (path.isEmpty())
+		qCWarning(vostopPanels) << "panel not found in" << m_userDir << "or" << m_builtInDir << ":" << name;
+	return path;
 }
 
 QVariantMap PanelLayout::errorNode(const QString& msg) const {
@@ -201,7 +240,33 @@ void PanelLayout::load() {
 	if (m_tree != next) {
 		m_tree = next;
 		emit treeChanged();
+		logResolved();
+	} else {
+		logResolved();
 	}
+}
+
+//? Verification aid, mirrors the worker tick-debug pattern: resolved panel
+//* list per load, debug-gated under vostop.panels
+void PanelLayout::logResolved() const {
+	if (!vostopPanels().isDebugEnabled())
+		return;
+	QStringList sources;
+	collectSources(m_tree, &sources);
+	for (const QString& name : sources) {
+		const QString path = resolveSource(name);
+		qCDebug(vostopPanels) << "panel:" << name << "->" << (path.isEmpty() ? QStringLiteral("<unresolved>") : path);
+	}
+}
+
+void PanelLayout::collectSources(const QVariantMap& node, QStringList* out) const {
+	if (node.contains(QStringLiteral("source"))) {
+		out->append(node.value(QStringLiteral("source")).toString());
+		return;
+	}
+	const QVariantList children = node.value(QStringLiteral("children")).toList();
+	for (const QVariant& child : children)
+		collectSources(child.toMap(), out);
 }
 
 void PanelLayout::setupWatcher() {

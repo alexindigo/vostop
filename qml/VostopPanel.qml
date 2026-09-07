@@ -19,19 +19,24 @@ Item {
     readonly property string panelTitle: root.panelItem && root.panelItem.panelTitle !== undefined
         ? String(root.panelItem.panelTitle) : ""
 
+    //? One Loader path for user panels and built-ins: PanelLayoutBackend
+    //? resolves user dir first (shadows built-ins), then the CMake-baked dir
+    readonly property string resolvedPath: root.sourceName === ""
+        ? "" : PanelLayoutBackend.resolveSource(root.sourceName)
+
     Loader {
         id: panelLoader
         anchors.fill: parent
         anchors.margins: root.panelGap
         asynchronous: true
-        source: "file://" + PanelLayoutBackend.builtInDir + "/" + root.sourceName + ".qml"
+        source: root.resolvedPath === "" ? "" : "file://" + root.resolvedPath
     }
 
-    //? Error tile: covers load/creation failure
+    //? Error tile: covers resolution failure + load/creation failure
     Rectangle {
         anchors.fill: parent
         anchors.margins: root.panelGap
-        visible: panelLoader.status === Loader.Error || panelLoader.source.toString() === ""
+        visible: root.resolvedPath === "" || panelLoader.status === Loader.Error
         color: Theme.cardBg
         border.color: Theme.cardBorder
         radius: 8
@@ -50,7 +55,16 @@ Item {
                 Layout.fillWidth: true
             }
             Label {
-                text: panelLoader.source.toString()
+                visible: root.resolvedPath === ""
+                text: qsTr("not found in user or built-in panels")
+                color: Theme.textFaint
+                font.pixelSize: 9
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+            Label {
+                visible: root.resolvedPath !== ""
+                text: root.resolvedPath
                 color: Theme.textFaint
                 font.pixelSize: 9
                 wrapMode: Text.WordWrap
