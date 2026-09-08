@@ -49,7 +49,29 @@ namespace {
 		double lastBusy = 0.0;
 		quint64 lastMem = 0;
 		double wall = 0.0;                        //? last sample wall clock (monotonic s)
+		std::vector<std::string> drmFds;          //? fd numbers holding DRM nodes, refreshed every walk
 	};
+
+	//? Cheap pre-check (perf pass): which fds of this pid hold DRM nodes?
+	//? readlink only — no file opens. Refreshed every walk so closed/reopened
+	//? fds can't go stale (fd numbers change when fds close and reopen).
+	static bool drm_fd_numbers(const fs::path& fdDir, std::vector<std::string>& numbers) {
+		numbers.clear();
+		std::error_code ec;
+		if (not fs::is_directory(fdDir, ec)) return false;
+		for (const auto& fd : fs::directory_iterator(fdDir, ec)) {
+			char buf[256];
+			const ssize_t len = readlink(fd.path().c_str(), buf, sizeof(buf) - 1);
+			if (len <= 0) continue;
+			buf[len] = '\0';
+			const std::string_view target(buf);
+			if (target.find("renderD") != std::string_view::npos
+				or target.find("/drm") != std::string_view::npos) {
+				numbers.push_back(fd.path().filename().string());
+			}
+		}
+		return not numbers.empty();
+	}
 
 	std::unordered_map<quint64, PidState> pid_cache;
 	std::chrono::steady_clock::time_point last_scan{};
@@ -91,42 +113,33 @@ QHash<quint64, ProcGpu> collect(bool newTick) {
 		const quint64 pid = std::stoull(pid_str);
 
 		auto pit = pid_cache.find(pid);
-		if (pit != pid_cache.end() and pit->second.hasDrm) {
-			//? Known DRM holder — re-read its fdinfo this tick
-		} else {
-			//? Cheap pre-check: does this pid hold a DRM fd? (readlink /proc/<pid>/fd/*)
-			bool hasDrm = false;
-			const fs::path fdDir = Shared::procPath / pid_str / "fd";
-			if (fs::is_directory(fdDir, ec)) {
-				for (const auto& fd : fs::directory_iterator(fdDir, ec)) {
-					char buf[256];
-					const ssize_t len = readlink(fd.path().c_str(), buf, sizeof(buf) - 1);
-					if (len > 0) {
-						buf[len] = '\0';
-						if (std::string_view(buf).find("renderD") != std::string_view::npos
-							or std::string_view(buf).find("/drm") != std::string_view::npos) {
-							hasDrm = true;
-							break;
-						}
-					}
-				}
-			}
-			if (not hasDrm) continue;
+		if (pit == pid_cache.end())
 			pit = pid_cache.emplace(pid, PidState{}).first;
-			pit->second.hasDrm = true;
+
+		//? Refresh the DRM fd set every walk (perf pass: readlink stays cheap,
+		//? stale fd numbers from closed fds must not linger).
+		const fs::path fdDir = Shared::procPath / pid_str / "fd";
+		if (not drm_fd_numbers(fdDir, pit->second.drmFds)) {
+			if (pit->second.hasDrm) {
+				pit->second.hasDrm = false;
+				pit->second.drmFds.clear();
+			}
+			continue;
 		}
+		pit->second.hasDrm = true;
 
 		PidState& st = pit->second;
 
-		//? Scan fdinfo files of this pid (std::ifstream — QFile misbehaves on 0-size /proc files)
+		//? Read only the fdinfo files of the DRM fds (perf pass: ~10 opens
+		//? per pid instead of ~50–80). std::ifstream — QFile misbehaves on
+		//? 0-size /proc files.
 		const fs::path fdi = Shared::procPath / pid_str / "fdinfo";
 		QHash<QString, quint64> clientEngines;
 		QHash<quint64, quint64> clientMem;
 		QString driver, pdev;
 		QSet<quint64> clients;
-		std::error_code fec;
-		for (const auto& f : fs::directory_iterator(fdi, fec)) {
-			std::ifstream file(f.path());
+		for (const auto& fdNum : st.drmFds) {
+			std::ifstream file(fdi / fdNum);
 			if (not file.good()) continue;
 			quint64 client = 0;
 			for (string line; std::getline(file, line);) {

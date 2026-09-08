@@ -135,14 +135,24 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 
 	//? Stolen proc scan (same worker tick, plan: "same worker thread, same snapshot pattern")
 	ProcSnapshot ps;
-	QElapsedTimer procTimer;
-	procTimer.start();
+	auto ema = [](double oldMs, double sampleMs) {
+		return oldMs == 0.0 ? sampleMs : 0.9 * oldMs + 0.1 * sampleMs;
+	};
+	QElapsedTimer collectTimer;
+	collectTimer.start();
 	try {
 		const auto& procs = Proc::collect(false);
+		m_collectMs = ema(m_collectMs, static_cast<double>(collectTimer.nsecsElapsed()) / 1e6);
 		ps.rows.reserve(static_cast<qsizetype>(procs.size()));
 		ps.totalProcs = static_cast<int>(procs.size());
 		ps.numpids = Proc::numpids.load();
 		quint64 threadsTotal = 0;
+		//? Perf toggles (phase-6 commit 1): io reads gated so their share is measurable
+		const bool ioReads = Settings::getB("proc_io_reads");
+		QElapsedTimer rowsTimer;
+		rowsTimer.start();
+		qint64 ioNanos = 0;
+		QElapsedTimer ioTimer;
 		for (const auto& p : procs) {
 			ProcSnapshot::Row row;
 			row.pid = p.pid;
@@ -156,15 +166,22 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 			row.nice = p.p_nice;
 			row.ppid = p.ppid;
 			//? Parity: per-process disk I/O rates (EACCES → ioKnown=false → "—")
-			row.ioKnown = Proc::io_rates(p.pid, row.ioReadRate, row.ioWriteRate);
+			if (ioReads) {
+				ioTimer.start();
+				row.ioKnown = Proc::io_rates(p.pid, row.ioReadRate, row.ioWriteRate);
+				ioNanos += ioTimer.nsecsElapsed();
+			} else {
+				row.ioKnown = false;
+				row.ioReadRate = row.ioWriteRate = 0.0;
+			}
 			//? Parity: Apps/Background/System category (cached per pid in the collector)
 			row.category = static_cast<int>(Proc::classify_category(p.pid, p.ppid, p.cpu_s));
 			threadsTotal += p.threads;
 			ps.rows.append(row);
 		}
 		ps.threadsTotal = threadsTotal;
-		m_procScanMs = m_procScanMs == 0.0 ? procTimer.elapsed()
-			: 0.9 * m_procScanMs + 0.1 * procTimer.elapsed();
+		m_rowsMs = ema(m_rowsMs, static_cast<double>(rowsTimer.nsecsElapsed()) / 1e6);
+		m_ioMs = ema(m_ioMs, static_cast<double>(ioNanos) / 1e6);
 
 		//? Detail readout for the selected pid (stolen _collect_details)
 		if (Proc::detailed_pid.load() != 0 and not procs.empty()) {
@@ -281,10 +298,12 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 		qCWarning(vostopWorker) << "gpu collect failed:" << e.what();
 	}
 
-	//? Per-process GPU (parity): fdinfo walk on the slow cadence, NVML per-pid fallback
+	//? Per-process GPU (parity): fdinfo walk on the slow cadence, NVML per-pid fallback.
+	//? Perf toggle (phase-6 commit 1): fdinfo gated so its share is measurable.
 	QHash<quint64, GpuProcs::ProcGpu> procGpu;
 	try {
-		procGpu = GpuProcs::collect(m_tickCounter % 2 == 0);
+		if (Settings::getB("gpu_fdinfo_walk"))
+			procGpu = GpuProcs::collect(m_tickCounter % 2 == 0);
 		if (procGpu.isEmpty())
 			procGpu = GpuProcs::nvmlPerPid();
 		fdinfoRan = true;
@@ -292,8 +311,7 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 		qCDebug(vostopWorker) << "gpu_procs walk failed:" << e.what();
 	}
 	if (fdinfoRan)
-		m_fdinfoMs = m_fdinfoMs == 0.0 ? fdinfoTimer.elapsed()
-			: 0.9 * m_fdinfoMs + 0.1 * fdinfoTimer.elapsed();
+		m_fdinfoMs = ema(m_fdinfoMs, static_cast<double>(fdinfoTimer.nsecsElapsed()) / 1e6);
 
 	//? Intel approximate device card: no real backend found a card, but fdinfo
 	//? clients exist on this machine → device-level aggregate, labeled approximate.
@@ -399,7 +417,8 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 			<< ss.batteryStatus << "watts" << ss.cpuWattsAvailable << ss.cpuWatts;
 		//? Phase-6 perf gate: per-pid io + fdinfo overhead (post-MVP perf pass input)
 		qCDebug(vostopWorker) << "tick: ms total" << tickTimer.elapsed()
-			<< "| proc scan" << procTimer.elapsed() << "| fdinfo walk" << (m_tickCounter % 2 == 0 ? fdinfoTimer.elapsed() : -1);
+			<< "| collect" << m_collectMs << "| rows" << m_rowsMs
+			<< "| io" << m_ioMs << "| fdinfo walk" << (m_tickCounter % 2 == 0 ? m_fdinfoMs : -1.0);
 	}
 }
 

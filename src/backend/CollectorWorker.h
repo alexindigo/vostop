@@ -48,5 +48,5 @@ private:
 	bool m_psiAvailable = false;
 	quint64 m_tickCounter = 0;
 	//? Phase-6 perf gate: rolling averages (ms) for the phase doc's overhead record
-	double m_procScanMs = 0.0, m_ioRatesMs = 0.0, m_fdinfoMs = 0.0;
+	double m_collectMs = 0.0, m_rowsMs = 0.0, m_ioMs = 0.0, m_fdinfoMs = 0.0;
 };
