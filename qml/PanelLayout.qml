@@ -7,7 +7,8 @@ import Vostop
 
 //? Recursive layout renderer over PanelLayoutBackend.tree (v1 view mode).
 //? Containers become RowLayout (direction "rows", horizontal) / ColumnLayout
-//? ("cols", vertical) with N+1 gap slots along the axis; leaves become
+//? ("cols", vertical) whose ONLY gap mechanism is spacing between siblings —
+//? edge insets belong to the shell (single ownership per gap); leaves become
 //? VostopPanel. grow splits extra space along the container axis (weight =
 //? node's grow), cross-axis always fills; minWidth/minHeight floor the box.
 Item {
@@ -82,13 +83,11 @@ Item {
                 panelGap: wrapper.nodeGap
             }
 
-            //? Container along "rows" → horizontal; N+1 gap slots: margins
-            //? (before/after) + spacing (between), cross-axis fills
+            //? Container along "rows" → horizontal; spacing between children
+            //? only, no edge insets (the shell owns the frame), cross-axis fills
             RowLayout {
                 visible: wrapper.isContainer && wrapper.nodeDir === "rows"
                 anchors.fill: parent
-                anchors.leftMargin: wrapper.nodeGap
-                anchors.rightMargin: wrapper.nodeGap
                 spacing: wrapper.nodeGap
 
                 Repeater {
@@ -114,12 +113,10 @@ Item {
                 }
             }
 
-            //? Container along "cols" → vertical
+            //? Container along "cols" → vertical; same single mechanism
             ColumnLayout {
                 visible: wrapper.isContainer && wrapper.nodeDir === "cols"
                 anchors.fill: parent
-                anchors.topMargin: wrapper.nodeGap
-                anchors.bottomMargin: wrapper.nodeGap
                 spacing: wrapper.nodeGap
 
                 Repeater {
