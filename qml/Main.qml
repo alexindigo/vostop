@@ -17,12 +17,15 @@ ApplicationWindow {
 
     ColumnLayout {
         anchors.fill: parent
-        spacing: 0
+        //? The shell owns the window frame and the header↔grid gap — the
+        //? single outer inset. The panel engine owns only spacing between
+        //? siblings, so every gap in the window has exactly one owner.
+        anchors.margins: 8
+        spacing: 8
 
         //? Header: title + poll interval + theme + About (phase 6)
         RowLayout {
             Layout.fillWidth: true
-            Layout.margins: 8
             spacing: 8
 
             Label {
@@ -64,8 +67,6 @@ ApplicationWindow {
         PanelLayout {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.margins: 8
-            Layout.topMargin: 0
         }
     }
 

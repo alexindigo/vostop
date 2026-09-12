@@ -62,7 +62,10 @@ class GroupedProcModel : public QAbstractListModel {
 public:
 	enum { CategoryRole = Qt::UserRole + 100 }; //? section.property role (0/1/2)
 
+private:
 	explicit GroupedProcModel(QObject* parent = nullptr);
+
+public:
 
 	static GroupedProcModel& instance();
 	static GroupedProcModel* create(QQmlEngine* engine, QJSEngine* jsEngine);

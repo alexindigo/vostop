@@ -46,7 +46,10 @@ class CpuMonitor : public QObject {
 	Q_PROPERTY(QString cpuName READ cpuName NOTIFY cpuNameChanged FINAL)
 
 public:
+private:
 	explicit CpuMonitor(QObject* parent = nullptr);
+
+public:
 
 	//* Process-wide singleton instance (worker connects to it, QML displays it)
 	static CpuMonitor& instance();
@@ -113,7 +116,10 @@ class MemMonitor : public QObject {
 	Q_PROPERTY(QList<double> pressureHistory READ pressureHistory NOTIFY pressureChanged FINAL)
 
 public:
+private:
 	explicit MemMonitor(QObject* parent = nullptr);
+
+public:
 
 	//* Process-wide singleton instance (worker connects to it, QML displays it)
 	static MemMonitor& instance();

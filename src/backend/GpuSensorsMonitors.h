@@ -25,7 +25,10 @@ class GpuMonitor : public QObject {
 	Q_PROPERTY(bool available READ available NOTIFY gpusChanged FINAL)
 
 public:
+private:
 	explicit GpuMonitor(QObject* parent = nullptr);
+
+public:
 
 	static GpuMonitor& instance();
 	static GpuMonitor* create(QQmlEngine* engine, QJSEngine* jsEngine);
@@ -64,7 +67,10 @@ class SensorsMonitor : public QObject {
 	Q_PROPERTY(double cpuWatts READ cpuWatts NOTIFY wattsChanged FINAL)
 
 public:
+private:
 	explicit SensorsMonitor(QObject* parent = nullptr);
+
+public:
 
 	static SensorsMonitor& instance();
 	static SensorsMonitor* create(QQmlEngine* engine, QJSEngine* jsEngine);

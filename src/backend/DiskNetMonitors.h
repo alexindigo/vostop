@@ -29,7 +29,10 @@ class DiskMonitor : public QObject {
 	Q_PROPERTY(QList<double> ioPressureHistory READ ioPressureHistory NOTIFY ioPressureChanged FINAL)
 
 public:
+private:
 	explicit DiskMonitor(QObject* parent = nullptr);
+
+public:
 
 	static DiskMonitor& instance();
 	static DiskMonitor* create(QQmlEngine* engine, QJSEngine* jsEngine);
@@ -70,7 +73,10 @@ class NetMonitor : public QObject {
 	Q_PROPERTY(QList<double> upHistory READ upHistory NOTIFY historyChanged FINAL)
 
 public:
+private:
 	explicit NetMonitor(QObject* parent = nullptr);
+
+public:
 
 	static NetMonitor& instance();
 	static NetMonitor* create(QQmlEngine* engine, QJSEngine* jsEngine);
