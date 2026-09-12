@@ -81,7 +81,10 @@ public:
 	};
 	Q_ENUM(Roles)
 
+private:
 	explicit ProcessModel(QObject* parent = nullptr);
+
+public:
 
 	//* Process-wide singleton instance (worker connects to it, QML displays it)
 	static ProcessModel& instance();
