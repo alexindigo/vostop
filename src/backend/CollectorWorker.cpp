@@ -14,11 +14,26 @@
 #include <QLoggingCategory>
 #include <QThread>
 
+#include <fstream>
+
 Q_LOGGING_CATEGORY(vostopWorker, "vostop.worker")
 
 CollectorWorker* CollectorWorker::instance() {
 	static CollectorWorker inst;
 	return &inst;
+}
+
+quint64 CollectorWorker::readMeminfoKib(const std::string& key) { //? /proc/meminfo "Key: N kB" → N
+	std::ifstream mi("/proc/meminfo");
+	std::string name;
+	unsigned long long value = 0;
+	while (mi >> name) {
+		if (name == key + ":") {
+			mi >> value;
+			break;
+		}
+	}
+	return static_cast<quint64>(value) * 1024; //? meminfo values are KiB → bytes
 }
 
 CollectorWorker::CollectorWorker(QObject* parent)
@@ -109,6 +124,24 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 		ms.hasSwap = Mem::has_swap and ms.swapTotal > 0;
 		for (const long long v : mem.percent.at("used"))
 			ms.history.append(static_cast<double>(v));
+
+		//? Win-TM Performance fields: swap-history ring + commit/kernel stats
+		//? (tiny per-tick /proc reads — worker stays the only collector that touches files)
+		if (mem.percent.count("swap_used"))
+			for (const long long v : mem.percent.at("swap_used"))
+				ms.swapHistory.append(static_cast<double>(v));
+		ms.commitAS = readMeminfoKib("Committed_AS");
+		ms.commitLimit = readMeminfoKib("CommitLimit");
+		ms.kernelSlab = readMeminfoKib("Slab");
+		ms.kernelReclaimable = readMeminfoKib("SReclaimable");
+		if (ms.commitAS > m_commitPeak) m_commitPeak = ms.commitAS;
+		ms.commitPeak = m_commitPeak;
+		{
+			std::ifstream fnr("/proc/sys/fs/file-nr");
+			quint64 allocated = 0;
+			fnr >> allocated; //? field 1: allocated handles
+			cs.handles = allocated;
+		}
 	} catch (const std::exception& e) {
 		qCWarning(vostopWorker) << "collect tick failed:" << e.what();
 		return;

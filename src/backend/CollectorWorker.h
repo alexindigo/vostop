@@ -44,9 +44,14 @@ private slots:
 	void tick();
 
 private:
+	//* Win-TM Performance fields: tiny per-tick reads (/proc/meminfo four keys,
+	//* /proc/sys/fs/file-nr field 1)
+	static quint64 readMeminfoKib(const std::string& key);
+
 	QTimer m_timer;
 	bool m_psiAvailable = false;
 	quint64 m_tickCounter = 0;
+	quint64 m_commitPeak = 0; //? Win-TM: running max of Committed_AS (resets on restart)
 	//? Phase-6 perf gate: rolling averages (ms) for the phase doc's overhead record
 	double m_collectMs = 0.0, m_rowsMs = 0.0, m_ioMs = 0.0, m_fdinfoMs = 0.0;
 };

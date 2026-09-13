@@ -23,6 +23,8 @@ class CpuMonitor : public QObject {
 	QML_ELEMENT
 	//? Total usage percent (0–100)
 	Q_PROPERTY(int usage READ usage NOTIFY usageChanged FINAL)
+	//? Allocated handles — /proc/sys/fs/file-nr field 1 (Win-TM Totals box)
+	Q_PROPERTY(quint64 handles READ handles NOTIFY handlesChanged FINAL)
 	//? Latest percent per logical core
 	Q_PROPERTY(QList<double> perCore READ perCore NOTIFY perCoreChanged FINAL)
 	//? Per-core rings for the grid view (phase 6)
@@ -57,6 +59,7 @@ public:
 	static CpuMonitor* create(QQmlEngine* engine, QJSEngine* jsEngine);
 
 	int usage() const { return m_usage; }
+	quint64 handles() const { return m_handles; }
 	QList<double> perCore() const { return m_perCore; }
 	QVariantList coreHistories() const { return m_coreHistories; }
 	QString freqText() const { return m_freqText; }
@@ -76,6 +79,7 @@ public slots:
 
 signals:
 	void usageChanged();
+	void handlesChanged();
 	void perCoreChanged();
 	void freqTextChanged();
 	void loadChanged();
@@ -86,6 +90,7 @@ signals:
 
 private:
 	int m_usage = 0;
+	quint64 m_handles = 0;
 	QList<double> m_perCore;
 	QVariantList m_coreHistories;
 	QString m_freqText;
@@ -109,6 +114,13 @@ class MemMonitor : public QObject {
 	Q_PROPERTY(quint64 swapTotal READ swapTotal NOTIFY memChanged FINAL)
 	Q_PROPERTY(quint64 swapUsed READ swapUsed NOTIFY memChanged FINAL)
 	Q_PROPERTY(bool hasSwap READ hasSwap NOTIFY memChanged FINAL)
+	//? Win-TM Performance fields (additive; phase wintm-panel)
+	Q_PROPERTY(quint64 commitAS READ commitAS NOTIFY memChanged FINAL)
+	Q_PROPERTY(quint64 commitLimit READ commitLimit NOTIFY memChanged FINAL)
+	Q_PROPERTY(quint64 commitPeak READ commitPeak NOTIFY memChanged FINAL)
+	Q_PROPERTY(quint64 kernelSlab READ kernelSlab NOTIFY memChanged FINAL)
+	Q_PROPERTY(quint64 kernelReclaimable READ kernelReclaimable NOTIFY memChanged FINAL)
+	Q_PROPERTY(QList<double> swapHistory READ swapHistory NOTIFY swapHistoryChanged FINAL)
 	Q_PROPERTY(QList<double> history READ history NOTIFY historyChanged FINAL)
 	Q_PROPERTY(bool pressureValid READ pressureValid NOTIFY pressureChanged FINAL)
 	Q_PROPERTY(QList<double> pressureSome READ pressureSome NOTIFY pressureChanged FINAL)
@@ -134,6 +146,12 @@ public:
 	quint64 swapTotal() const { return m_swapTotal; }
 	quint64 swapUsed() const { return m_swapUsed; }
 	bool hasSwap() const { return m_hasSwap; }
+	quint64 commitAS() const { return m_commitAS; }
+	quint64 commitLimit() const { return m_commitLimit; }
+	quint64 commitPeak() const { return m_commitPeak; }
+	quint64 kernelSlab() const { return m_kernelSlab; }
+	quint64 kernelReclaimable() const { return m_kernelReclaimable; }
+	QList<double> swapHistory() const { return m_swapHistory; }
 	QList<double> history() const { return m_history; }
 	bool pressureValid() const { return m_pressure.valid; }
 	QList<double> pressureSome() const;
@@ -146,12 +164,17 @@ public slots:
 signals:
 	void memChanged();
 	void historyChanged();
+	void swapHistoryChanged();
 	void pressureChanged();
 
 private:
 	quint64 m_total = 0, m_used = 0, m_free = 0, m_available = 0, m_cached = 0;
 	quint64 m_swapTotal = 0, m_swapUsed = 0;
 	bool m_hasSwap = false;
+	//? Win-TM Performance fields
+	quint64 m_commitAS = 0, m_commitLimit = 0, m_commitPeak = 0;
+	quint64 m_kernelSlab = 0, m_kernelReclaimable = 0;
+	QList<double> m_swapHistory;
 	QList<double> m_history;
 	QList<double> m_pressureHistory;
 	PressureSnapshot m_pressure;
