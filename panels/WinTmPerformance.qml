@@ -27,16 +27,16 @@ Item {
     function px(v) { return Math.max(1, Math.round(v * u)) }
 
     //? Soft palette — chrome follows the app theme; screens stay dark (the
-    //? display surface) but softened off pure black; green/yellow are the
-    //? XP-TM trace signature
+    //? display surface) but softened off pure black; teal/hot are the
+    //? brand's trace identity (#1C9993 from the logo work)
     readonly property color face: Theme.windowBg
     readonly property color card: Theme.cardBgAlt
     readonly property color faceText: Theme.text
     readonly property color captionText: Theme.textDim
     readonly property color screen: "#10150f"
     readonly property color screenSofter: "#162016"
-    readonly property color graphGreen: "#00e000"
-    readonly property color graphYellow: "#e8e800"
+    readonly property color graphTeal: "#1c9993"
+    readonly property color graphHot: "#e8e800"
 
     //? Borderless card: header caption on top, content flows below it via
     //? the layout — consumers never position against the caption by hand
@@ -70,8 +70,9 @@ Item {
         radius: root.px(4)
     }
 
-    //? Gauge: matrix screen (with total or per-core segmented level bar);
-    //? value pinned at the bottom of the card flow
+    //? Gauge: matrix screen; per-core usage as a column chart over the matrix
+    //? (one column per core); total level bar when cores unavailable; value
+    //? pinned at the bottom of the card flow
     component WinTmGauge: WinTmCard {
         id: gaugeRoot
         property string valueText
@@ -91,7 +92,7 @@ Item {
                 onPaint: {
                     const ctx = getContext("2d")
                     ctx.clearRect(0, 0, width, height)
-                    ctx.fillStyle = "#1d5a2a"
+                    ctx.fillStyle = "#143936"
                     const step = root.px(5)
                     for (let y = root.px(2); y < height; y += step)
                         for (let x = root.px(2); x < width; x += step)
@@ -99,37 +100,34 @@ Item {
                 }
             }
 
-            //? Per-core segmented bar (falls back to total level bar)
-            Row {
-                id: coreStack
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.bottom: parent.bottom
+            //? Per-core column chart — one column per core, height = usage
+            Item {
+                anchors.fill: parent
                 anchors.margins: root.px(4)
-                spacing: root.px(2)
-                height: root.px(5)
                 visible: gaugeRoot.cores.length > 0
                 Repeater {
                     model: gaugeRoot.cores
-                    delegate: Rectangle {
-                        id: coreRow
+                    delegate: Item {
+                        id: coreCol
                         required property var modelData
+                        required property int index
+                        readonly property real gap: root.px(2)
                         readonly property int coreCount: gaugeRoot.cores.length
-                        width: (coreStack.width - (coreStack.spacing * (coreRow.coreCount - 1))) / coreRow.coreCount
+                        width: (parent.width - gap * (coreCount - 1)) / coreCount
                         height: parent.height
-                        radius: root.px(1)
-                        color: root.screenSofter
+                        x: index * (width + gap)
                         Rectangle {
                             anchors.left: parent.left
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: parent.width * (coreRow.modelData / 100.0)
-                            height: parent.height
-                            radius: parent.radius
-                            color: root.graphGreen
+                            anchors.right: parent.right
+                            anchors.bottom: parent.bottom
+                            height: parent.height * (coreCol.modelData / 100.0)
+                            color: root.graphTeal
                         }
                     }
                 }
             }
+
+            //? Total level bar (fallback when per-core data unavailable)
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
@@ -143,11 +141,7 @@ Item {
                     width: parent.width * gaugeRoot.fraction
                     height: parent.height
                     radius: root.px(1)
-                    gradient: Gradient {
-                        orientation: Gradient.Horizontal
-                        GradientStop { position: 0.0; color: "#0a7a30" }
-                        GradientStop { position: 1.0; color: root.graphGreen }
-                    }
+                    color: root.graphTeal
                 }
             }
         }
@@ -157,7 +151,7 @@ Item {
             Layout.alignment: Qt.AlignHCenter
             font.bold: true
             font.pixelSize: root.px(19)
-            color: root.graphGreen
+            color: root.graphTeal
         }
     }
 
@@ -166,7 +160,7 @@ Item {
         id: graphRoot
         property list<double> samples: []
         property list<var> series: []
-        property color lineColor: root.graphGreen
+        property color lineColor: root.graphTeal
 
         WinTmScreen {
             Layout.fillWidth: true
@@ -178,8 +172,7 @@ Item {
                 series: graphRoot.series
                 maxValue: 100
                 lineColor: graphRoot.lineColor
-                fillColor: "transparent"
-                gridColor: Qt.rgba(0, 0.85, 0, 0.25)
+                gridColor: Qt.rgba(0.11, 0.60, 0.58, 0.25) //? teal grid
                 gridDivisions: 6
                 verticalDivisions: Math.max(1, Math.round(width / 26))
             }
@@ -312,7 +305,7 @@ Item {
                     WinTmGraph {
                         caption: qsTr("Swap Usage History")
                         samples: MemMonitor.swapHistory
-                        lineColor: root.graphYellow
+                        lineColor: root.graphHot
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
