@@ -44,6 +44,15 @@ Item {
 
             anchors.fill: parent
 
+            //? Content size propagates up the tree so the shell can floor the
+            //? window at the content's implicit size (never eats content)
+            implicitWidth: rowsLayout.visible ? rowsLayout.implicitWidth
+                : colsLayout.visible ? colsLayout.implicitWidth
+                : leafPanel.implicitWidth
+            implicitHeight: rowsLayout.visible ? rowsLayout.implicitHeight
+                : colsLayout.visible ? colsLayout.implicitHeight
+                : leafPanel.implicitHeight
+
             //? Invalid node → error tile
             Rectangle {
                 visible: wrapper.isInvalid
@@ -77,6 +86,7 @@ Item {
 
             //? Leaf → VostopPanel (gap pads the widget on all sides, spec §2)
             VostopPanel {
+                id: leafPanel
                 visible: wrapper.isLeaf
                 anchors.fill: parent
                 sourceName: wrapper.isLeaf ? wrapper.node.source : ""
@@ -86,6 +96,7 @@ Item {
             //? Container along "rows" → horizontal; spacing between children
             //? only, no edge insets (the shell owns the frame), cross-axis fills
             RowLayout {
+                id: rowsLayout
                 visible: wrapper.isContainer && wrapper.nodeDir === "rows"
                 anchors.fill: parent
                 spacing: wrapper.nodeGap
@@ -115,6 +126,7 @@ Item {
 
             //? Container along "cols" → vertical; same single mechanism
             ColumnLayout {
+                id: colsLayout
                 visible: wrapper.isContainer && wrapper.nodeDir === "cols"
                 anchors.fill: parent
                 spacing: wrapper.nodeGap
@@ -145,9 +157,14 @@ Item {
 
     //? Root node fills this item; the binding chain re-renders on tree change
     Loader {
+        id: rootLoader
         anchors.fill: parent
         property var nodeData: root.tree
         property string dir: ""
         sourceComponent: nodeComponent
     }
+
+    //? Content size up to the shell (window minimum = content + frame inset)
+    implicitWidth: rootLoader.implicitWidth
+    implicitHeight: rootLoader.implicitHeight
 }

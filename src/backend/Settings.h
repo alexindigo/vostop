@@ -51,7 +51,6 @@ QT_END_NAMESPACE
 	X(QString, shownGpus, "shown_gpus", "Auto") \
 	X(bool, nvmlMeasurePcieSpeeds, "nvml_measure_pcie_speeds", false) \
 	X(bool, rsmiMeasurePcieSpeeds, "rsmi_measure_pcie_speeds", false) \
-	X(QString, theme, "theme", "dark") \
 	X(bool, groupCollapsedApps, "group_collapsed_apps", false) \
 	X(bool, groupCollapsedBackground, "group_collapsed_background", false) \
 	X(bool, groupCollapsedSystem, "group_collapsed_system", false) \
