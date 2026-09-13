@@ -36,6 +36,10 @@ void CpuMonitor::update(const CpuSnapshot& snapshot) {
 		m_usage = snapshot.usage;
 		emit usageChanged();
 	}
+	if (changed(m_handles, snapshot.handles)) {
+		m_handles = snapshot.handles;
+		emit handlesChanged();
+	}
 	if (changed(m_perCore, snapshot.perCore) or changed(m_coreHistories.size(), snapshot.coreHistories.size())) {
 		m_perCore = snapshot.perCore;
 		m_coreHistories.clear();
@@ -107,7 +111,10 @@ void MemMonitor::update(const MemSnapshot& snapshot) {
 	bool memDiff = changed(m_total, snapshot.total) or changed(m_used, snapshot.used)
 		or changed(m_free, snapshot.free) or changed(m_available, snapshot.available)
 		or changed(m_cached, snapshot.cached) or changed(m_swapTotal, snapshot.swapTotal)
-		or changed(m_swapUsed, snapshot.swapUsed) or changed(m_hasSwap, snapshot.hasSwap);
+		or changed(m_swapUsed, snapshot.swapUsed) or changed(m_hasSwap, snapshot.hasSwap)
+		or changed(m_commitAS, snapshot.commitAS) or changed(m_commitLimit, snapshot.commitLimit)
+		or changed(m_commitPeak, snapshot.commitPeak) or changed(m_kernelSlab, snapshot.kernelSlab)
+		or changed(m_kernelReclaimable, snapshot.kernelReclaimable);
 	if (memDiff) {
 		m_total = snapshot.total;
 		m_used = snapshot.used;
@@ -117,7 +124,16 @@ void MemMonitor::update(const MemSnapshot& snapshot) {
 		m_swapTotal = snapshot.swapTotal;
 		m_swapUsed = snapshot.swapUsed;
 		m_hasSwap = snapshot.hasSwap;
+		m_commitAS = snapshot.commitAS;
+		m_commitLimit = snapshot.commitLimit;
+		m_commitPeak = snapshot.commitPeak;
+		m_kernelSlab = snapshot.kernelSlab;
+		m_kernelReclaimable = snapshot.kernelReclaimable;
 		emit memChanged();
+	}
+	if (changed(m_swapHistory, snapshot.swapHistory)) {
+		m_swapHistory = snapshot.swapHistory;
+		emit swapHistoryChanged();
 	}
 	if (changed(m_history, snapshot.history)) {
 		m_history = snapshot.history;

@@ -16,6 +16,7 @@ struct PressureSnapshot {
 
 struct CpuSnapshot {
 	int usage = 0;                 //? latest total percent
+	quint64 handles = 0;           //? allocated handles (/proc/sys/fs/file-nr field 1)
 	QList<double> perCore;         //? latest percent per core
 	QList<QList<double>> coreHistories; //? per-core rings (oldest → newest) for the grid view
 	double freqMHz = 0.0;          //? parsed from Cpu::cpuHz ("x.xx GHz")
@@ -35,6 +36,14 @@ struct MemSnapshot {
 	bool hasSwap = false;
 	PressureSnapshot pressure;
 	QList<double> pressureHistory; //? PSI some% ring (phase 6 sparkline)
+
+	//? Win-TM Performance tab fields (Worker-filled; phase wintm-panel)
+	QList<double> swapHistory;     //? swap-used percent ring (stolen mem.percent["swap_used"])
+	quint64 commitAS = 0;          //? /proc/meminfo Committed_AS (bytes)
+	quint64 commitLimit = 0;       //? /proc/meminfo CommitLimit (bytes)
+	quint64 commitPeak = 0;        //? worker-local max of Committed_AS (resets on restart)
+	quint64 kernelSlab = 0;        //? /proc/meminfo Slab (kernel memory total)
+	quint64 kernelReclaimable = 0; //? /proc/meminfo SReclaimable (paged)
 };
 
 Q_DECLARE_METATYPE(CpuSnapshot)

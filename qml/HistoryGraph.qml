@@ -10,10 +10,13 @@ Item {
     property color fillColor: Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.18)
     property color gridColor: Qt.rgba(1, 1, 1, 0.07)
     property int gridDivisions: 4
+    property int verticalDivisions: 0 //? 0 = off (existing users unaffected)
+    property list<var> series: [] //? optional multi-series: one samples-list per line (overrides samples)
 
     onSamplesChanged: canvas.requestPaint()
     onMaxValueChanged: canvas.requestPaint()
     onLineColorChanged: canvas.requestPaint()
+    onSeriesChanged: canvas.requestPaint()
     onWidthChanged: canvas.requestPaint()
     onHeightChanged: canvas.requestPaint()
 
@@ -36,7 +39,38 @@ Item {
                 ctx.moveTo(0, gy)
                 ctx.lineTo(width, gy)
             }
+            for (let gv = 1; gv < root.verticalDivisions; ++gv) {
+                const gx = Math.round(width * gv / root.verticalDivisions) + 0.5
+                ctx.moveTo(gx, 0)
+                ctx.lineTo(gx, height)
+            }
             ctx.stroke()
+
+            const drawLine = (data, color) => {
+                const n = data.length
+                if (n < 2)
+                    return
+                const dx = width / (n - 1)
+                const scaleY = (v) => height - (Math.min(Math.max(v, 0), root.maxValue) / root.maxValue) * height
+                ctx.beginPath()
+                for (let i = 0; i < n; ++i) {
+                    const x = i * dx
+                    const y = scaleY(data[i])
+                    if (i === 0) ctx.moveTo(x, y)
+                    else ctx.lineTo(x, y)
+                }
+                ctx.strokeStyle = color
+                ctx.lineWidth = 1.6
+                ctx.stroke()
+            }
+
+            //? Multi-series: one line per entry, alpha ramp (XP multi-CPU style)
+            if (root.series.length > 0) {
+                for (let s = 0; s < root.series.length; ++s)
+                    drawLine(root.series[s], Qt.rgba(root.lineColor.r, root.lineColor.g, root.lineColor.b, 0.9 - s * 0.15))
+                ctx.restore()
+                return
+            }
 
             const data = root.samples
             if (data.length < 2) {
