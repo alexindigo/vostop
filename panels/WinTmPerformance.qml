@@ -7,7 +7,7 @@ import Vostop
 
 //? XP Task Manager Performance tab — modernized: borderless rounded cards on
 //? the theme's window background (no bevels), soft surfaces, LED-matrix
-//? gauges with per-core segments, multi-core history lines, Linux-standard
+//? equalizer gauges, single-total history lines, Linux-standard
 //? Memory/Swap metrics instead of Page File. All type and chrome metrics
 //? derive from u = width/431 (1u = 1px in the reference screenshot), so the
 //? reference's text-to-panel proportions hold at any size.
@@ -26,17 +26,42 @@ Item {
     readonly property real u: width / 431
     function px(v) { return Math.max(1, Math.round(v * u)) }
 
-    //? Soft palette — chrome follows the app theme; screens stay dark (the
-    //? display surface) but softened off pure black; teal/hot are the
-    //? brand's trace identity (#1C9993 from the logo work)
+    //? Soft palette — chrome and traces come from the app theme; screens
+    //? stay dark (the display surface)
     readonly property color face: Theme.windowBg
     readonly property color card: Theme.cardBgAlt
     readonly property color faceText: Theme.text
     readonly property color captionText: Theme.textDim
     readonly property color screen: "#10150f"
     readonly property color screenSofter: "#162016"
-    readonly property color graphTeal: "#1c9993"
-    readonly property color graphHot: "#e8e800"
+
+    //? btop's Theme::g("cpu") analogue: lerp accentCpu -> accentHot by percent
+    function heatColor(pct) {
+        const t = Math.min(Math.max(pct, 0), 100) / 100.0
+        return Qt.rgba(
+            Theme.accentCpu.r + (Theme.accentHot.r - Theme.accentCpu.r) * t,
+            Theme.accentCpu.g + (Theme.accentHot.g - Theme.accentCpu.g) * t,
+            Theme.accentCpu.b + (Theme.accentHot.b - Theme.accentCpu.b) * t, 1)
+    }
+
+    //? CPU equalizer bars: one dict per core { "fraction": 0..1, "color": heat }
+    function coreBars() {
+        const out = []
+        for (let i = 0; i < CpuMonitor.perCore.length; ++i)
+            out.push({ "fraction": CpuMonitor.perCore[i] / 100.0,
+                       "color": root.heatColor(CpuMonitor.perCore[i]) })
+        return out
+    }
+
+    //? RAM/SWAP equalizer bars: RAM used + swap used (swap omitted when none)
+    function memBars() {
+        const ram = MemMonitor.total > 0 ? MemMonitor.used / MemMonitor.total : 0
+        const out = [{ "fraction": ram, "color": Theme.accentMem }]
+        if (MemMonitor.hasSwap && MemMonitor.swapTotal > 0)
+            out.push({ "fraction": MemMonitor.swapUsed / MemMonitor.swapTotal,
+                       "color": Theme.accentWarn })
+        return out
+    }
 
     //? Borderless card: header caption on top, content flows below it via
     //? the layout — consumers never position against the caption by hand
@@ -70,14 +95,16 @@ Item {
         radius: root.px(4)
     }
 
-    //? Gauge: matrix screen; per-core usage as a column chart over the matrix
-    //? (one column per core); total level bar when cores unavailable; value
-    //? pinned at the bottom of the card flow
+    //? Gauge: matrix screen; bar list as a column equalizer (narrow
+    //? vertical bars); falls back to a single total level bar for scalar
+    //? data; value pinned at the bottom of the card flow
     component WinTmGauge: WinTmCard {
         id: gaugeRoot
         property string valueText
         property real fraction: 0.0
-        property var cores: [] //? latest percent per core
+        property var bars: [] //? [{ "fraction": 0..1, "color": color }]; empty -> scalar fallback
+        property color valueColor: Theme.text
+        property color barColor: Theme.accentCpu
 
         WinTmScreen {
             Layout.fillWidth: true
@@ -100,48 +127,48 @@ Item {
                 }
             }
 
-            //? Per-core column chart — one column per core, height = usage
+            //? Bar equalizer — narrow vertical bars, one per entry
             Item {
                 anchors.fill: parent
                 anchors.margins: root.px(4)
-                visible: gaugeRoot.cores.length > 0
+                visible: gaugeRoot.bars.length > 0
                 Repeater {
-                    model: gaugeRoot.cores
+                    model: gaugeRoot.bars
                     delegate: Item {
                         id: coreCol
                         required property var modelData
                         required property int index
-                        readonly property real gap: root.px(2)
-                        readonly property int coreCount: gaugeRoot.cores.length
-                        width: (parent.width - gap * (coreCount - 1)) / coreCount
+                        readonly property real gap: root.px(1)
+                        readonly property int barCount: gaugeRoot.bars.length
+                        width: (parent.width - gap * (barCount - 1)) / barCount
                         height: parent.height
                         x: index * (width + gap)
                         Rectangle {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
-                            height: parent.height * (coreCol.modelData / 100.0)
-                            color: root.graphTeal
+                            height: parent.height * coreCol.modelData.fraction
+                            color: coreCol.modelData.color
                         }
                     }
                 }
             }
 
-            //? Total level bar (fallback when per-core data unavailable)
+            //? Total level bar (fallback for scalar data)
             Rectangle {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
                 anchors.margins: root.px(4)
                 height: root.px(5)
-                visible: gaugeRoot.cores.length === 0
+                visible: gaugeRoot.bars.length === 0
                 color: root.screenSofter
                 Rectangle {
                     anchors.left: parent.left
                     width: parent.width * gaugeRoot.fraction
                     height: parent.height
                     radius: root.px(1)
-                    color: root.graphTeal
+                    color: gaugeRoot.barColor
                 }
             }
         }
@@ -151,7 +178,7 @@ Item {
             Layout.alignment: Qt.AlignHCenter
             font.bold: true
             font.pixelSize: root.px(19)
-            color: root.graphTeal
+            color: gaugeRoot.valueColor
         }
     }
 
@@ -160,7 +187,8 @@ Item {
         id: graphRoot
         property list<double> samples: []
         property list<var> series: []
-        property color lineColor: root.graphTeal
+        property list<color> seriesColors: []
+        property color lineColor: Theme.accentCpu
 
         WinTmScreen {
             Layout.fillWidth: true
@@ -170,9 +198,10 @@ Item {
                 anchors.margins: root.px(4)
                 samples: graphRoot.samples
                 series: graphRoot.series
+                seriesColors: graphRoot.seriesColors
                 maxValue: 100
                 lineColor: graphRoot.lineColor
-                gridColor: Qt.rgba(0.11, 0.60, 0.58, 0.25) //? teal grid
+                gridColor: Qt.rgba(graphRoot.lineColor.r, graphRoot.lineColor.g, graphRoot.lineColor.b, 0.06) //? hairline
                 gridDivisions: 6
                 verticalDivisions: Math.max(1, Math.round(width / 26))
             }
@@ -282,15 +311,15 @@ Item {
                     WinTmGauge {
                         caption: qsTr("CPU Usage")
                         valueText: CpuMonitor.usage + " %"
-                        fraction: CpuMonitor.usage / 100.0
-                        cores: CpuMonitor.perCore
+                        valueColor: Theme.accentCpu
+                        bars: root.coreBars()
                         Layout.preferredWidth: root.px(115)
                         Layout.fillHeight: true
                     }
                     WinTmGraph {
                         caption: qsTr("CPU Usage History")
-                        series: CpuMonitor.coreHistories
                         samples: CpuMonitor.history
+                        lineColor: Theme.accentCpu
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
@@ -298,14 +327,19 @@ Item {
                     WinTmGauge {
                         caption: qsTr("Memory Usage")
                         valueText: root.mib(MemMonitor.used) + " MB"
-                        fraction: MemMonitor.total > 0 ? MemMonitor.used / MemMonitor.total : 0.0
+                        valueColor: Theme.accentMem
+                        bars: root.memBars()
                         Layout.preferredWidth: root.px(115)
                         Layout.fillHeight: true
                     }
                     WinTmGraph {
-                        caption: qsTr("Swap Usage History")
-                        samples: MemMonitor.swapHistory
-                        lineColor: root.graphHot
+                        caption: qsTr("Memory Usage History")
+                        samples: MemMonitor.history
+                        series: MemMonitor.hasSwap
+                                ? [MemMonitor.history, MemMonitor.swapHistory] : []
+                        seriesColors: MemMonitor.hasSwap
+                                ? [Theme.accentMem, Theme.accentWarn] : []
+                        lineColor: Theme.accentMem
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
