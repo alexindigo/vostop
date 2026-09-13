@@ -11,11 +11,13 @@ Item {
     property int gridDivisions: 4
     property int verticalDivisions: 0 //? 0 = off (existing users unaffected)
     property list<var> series: [] //? optional multi-series: one samples-list per line (overrides samples)
+    property list<color> seriesColors: [] //? parallel to series; empty → all lineColor
 
     onSamplesChanged: canvas.requestPaint()
     onMaxValueChanged: canvas.requestPaint()
     onLineColorChanged: canvas.requestPaint()
     onSeriesChanged: canvas.requestPaint()
+    onSeriesColorsChanged: canvas.requestPaint()
     onWidthChanged: canvas.requestPaint()
     onHeightChanged: canvas.requestPaint()
 
@@ -63,10 +65,10 @@ Item {
                 ctx.stroke()
             }
 
-            //? Multi-series: one line per entry, alpha ramp (XP multi-CPU style)
+            //? Multi-series: one line per entry, uniform alpha (caller colors)
             if (root.series.length > 0) {
                 for (let s = 0; s < root.series.length; ++s)
-                    drawLine(root.series[s], Qt.rgba(root.lineColor.r, root.lineColor.g, root.lineColor.b, 0.9 - s * 0.15))
+                    drawLine(root.series[s], root.seriesColors.length > s ? root.seriesColors[s] : root.lineColor)
                 ctx.restore()
                 return
             }
