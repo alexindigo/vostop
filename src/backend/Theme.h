@@ -1,7 +1,8 @@
 /*
- * vostop — palette singleton: dark default (like btop), light alternative.
- * Persisted via Settings.theme (phase 6). All cards read these; HistoryGraph
- * grid/labels follow the palette.
+ * vostop — palette singleton: follows the OS color scheme via the
+ * xdg-desktop-portal appearance setting (QStyleHints::colorScheme);
+ * Unknown keeps the btop-style dark default. All cards read these;
+ * HistoryGraph grid/labels follow the palette.
  */
 #pragma once
 

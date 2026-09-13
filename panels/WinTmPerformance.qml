@@ -14,6 +14,9 @@ import Vostop
 Item {
     id: root
     property string panelTitle: qsTr("Win-TM Performance")
+    //? Content size propagates up: VostopPanel -> PanelLayout -> window minimum
+    implicitWidth: flow.implicitWidth + root.px(20)
+    implicitHeight: flow.implicitHeight + root.px(20)
 
     //? XP-TM shows raw KiB digits
     function kib(b) { return Math.floor(b / 1024) }
@@ -263,8 +266,11 @@ Item {
         //? Single owner of the vertical flow: chart band (fixed) ->
         //? stat grid (fills the remainder) -> status bar (natural height)
         ColumnLayout {
+            id: flow
             anchors.fill: parent
-            anchors.margins: root.px(8)
+            //? Edge gap == block gap: the shell owns an 8px frame inset, the
+            //? panel tops it up so shell+margin == spacing at any scale
+            anchors.margins: Math.max(0, root.px(10) - 8)
             spacing: root.px(10)
 
             //? Chart band: fixed-compact (Item carries the layout attachment;
@@ -272,7 +278,7 @@ Item {
             Item {
                 Layout.fillWidth: true
                 Layout.preferredHeight: root.px(235)
-                Layout.minimumHeight: root.px(180)
+                Layout.minimumHeight: root.px(170)
                 Layout.fillHeight: true
                 GridLayout {
                     anchors.fill: parent
@@ -314,9 +320,10 @@ Item {
             }
 
             //? Stat cards — 2×2 grid, the panel's data area (content-sized,
-    //? never stretched; leftover space belongs to the chart band)
+            //? never stretched or shrunk; the chart band absorbs the flex)
             GridLayout {
                 Layout.fillWidth: true
+                Layout.minimumHeight: implicitHeight
                 columns: 2
                 rowSpacing: root.px(10)
                 columnSpacing: root.px(10)
@@ -366,6 +373,8 @@ Item {
             //? Status bar — one bar, cells in the reference's proportions
             WinTmStatusBar {
                 Layout.fillWidth: true
+                Layout.minimumHeight: implicitHeight
+                Layout.maximumHeight: implicitHeight
                 cells: [
                     { "text": qsTr("Processes: %1").arg(ProcessModel.totalProcs), "fill": false },
                     { "text": qsTr("CPU Usage: %1 %").arg(CpuMonitor.usage), "fill": false },

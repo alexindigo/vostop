@@ -14,6 +14,10 @@ Item {
     required property string sourceName
     property int panelGap: 0
 
+    //? Content size propagates up to the layout engine (window minimum)
+    implicitWidth: panelLoader.implicitWidth + root.panelGap * 2
+    implicitHeight: panelLoader.implicitHeight + root.panelGap * 2
+
     //? Loaded panel item (var so qmllint stays quiet about optional
     //? panelTitle on user panels — the contract makes it optional)
     readonly property var panelItem: panelLoader.status === Loader.Ready ? panelLoader.item : null

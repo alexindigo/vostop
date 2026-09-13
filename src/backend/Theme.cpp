@@ -3,14 +3,15 @@
  */
 #include "Theme.h"
 
-#include "Settings.h"
-
+#include <QGuiApplication>
 #include <QQmlEngine>
+#include <QStyleHints>
 
 Theme::Theme(QObject* parent)
 	: QObject(parent) {
-	//? Palette flips when the persisted theme key changes (phase 6)
-	connect(Settings::instance(), &Settings::themeChanged, this, &Theme::themeChanged);
+	//? Palette follows the OS color scheme (xdg-desktop-portal appearance);
+	//? repaints when the portal flips it
+	connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, this, &Theme::themeChanged);
 }
 
 Theme& Theme::instance() {
@@ -27,7 +28,8 @@ Theme* Theme::create(QQmlEngine* engine, QJSEngine* jsEngine) {
 }
 
 bool Theme::dark() const {
-	return Settings::instance()->theme() != QStringLiteral("light");
+	//? No portal answer (Unknown) keeps the btop-style dark default
+	return QGuiApplication::styleHints()->colorScheme() != Qt::ColorScheme::Light;
 }
 
 QColor Theme::windowBg() const { return dark() ? QColor(0x1a, 0x1a, 0x1a) : QColor(0xf2, 0xf2, 0xf4); }
