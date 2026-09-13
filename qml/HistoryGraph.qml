@@ -7,7 +7,6 @@ Item {
     property list<double> samples: []
     property double maxValue: 100.0
     property color lineColor: "#4fc3f7"
-    property color fillColor: Qt.rgba(lineColor.r, lineColor.g, lineColor.b, 0.18)
     property color gridColor: Qt.rgba(1, 1, 1, 0.07)
     property int gridDivisions: 4
     property int verticalDivisions: 0 //? 0 = off (existing users unaffected)
@@ -81,16 +80,6 @@ Item {
             const n = data.length
             const dx = width / (n - 1)
             const scaleY = (v) => height - (Math.min(Math.max(v, 0), root.maxValue) / root.maxValue) * height
-
-            //? Fill under curve
-            ctx.beginPath()
-            ctx.moveTo(0, height)
-            for (let i = 0; i < n; ++i)
-                ctx.lineTo(i * dx, scaleY(data[i]))
-            ctx.lineTo(width, height)
-            ctx.closePath()
-            ctx.fillStyle = root.fillColor
-            ctx.fill()
 
             //? Line
             ctx.beginPath()
