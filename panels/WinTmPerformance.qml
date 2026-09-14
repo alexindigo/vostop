@@ -99,6 +99,7 @@ Item {
         id: gaugeRoot
         property real fraction: 0.0
         property var bars: [] //? [{ "fraction": 0..1, "color": color }]; empty -> scalar fallback
+        property string overlay: "" //? ink text inside the screen (charts-only)
 
         WinTmScreen {
             Layout.fillWidth: true
@@ -121,7 +122,7 @@ Item {
                 }
             }
 
-            //? Bar equalizer — narrow vertical bars, one per entry
+            //? Individual lines — fixed-width verticals centered in each slot
             Item {
                 anchors.fill: parent
                 anchors.margins: root.px(4)
@@ -132,20 +133,30 @@ Item {
                         id: coreCol
                         required property var modelData
                         required property int index
-                        readonly property real gap: root.px(1)
                         readonly property int barCount: gaugeRoot.bars.length
-                        width: (parent.width - gap * (barCount - 1)) / barCount
+                        readonly property real lineW: root.px(2)
+                        width: parent.width / barCount
                         height: parent.height
-                        x: index * (width + gap)
+                        x: index * width + (width - lineW) / 2
                         Rectangle {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
                             anchors.bottom: parent.bottom
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            width: coreCol.lineW
                             height: parent.height * coreCol.modelData.fraction
                             color: coreCol.modelData.color
                         }
                     }
                 }
+            }
+
+            //? Ink overlay text inside the screen (top-left)
+            Label {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.margins: root.px(6)
+                text: gaugeRoot.overlay
+                font.pixelSize: root.px(12)
+                color: root.ink
             }
 
             //? Total level bar (fallback for scalar data)
@@ -175,6 +186,7 @@ Item {
         property list<var> series: []
         property list<color> seriesColors: []
         property color lineColor: root.ink
+        property string overlay: "" //? ink text inside the screen (top-left)
 
         WinTmScreen {
             Layout.fillWidth: true
@@ -190,6 +202,15 @@ Item {
                 gridColor: Qt.rgba(graphRoot.lineColor.r, graphRoot.lineColor.g, graphRoot.lineColor.b, 0.06) //? hairline
                 gridDivisions: 6
                 verticalDivisions: Math.max(1, Math.round(width / 26))
+            }
+            //? Ink overlay text inside the screen (top-left)
+            Label {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.margins: root.px(6)
+                text: graphRoot.overlay
+                font.pixelSize: root.px(12)
+                color: root.ink
             }
         }
     }
@@ -281,13 +302,13 @@ Item {
             anchors.margins: Math.max(0, root.px(10) - 8)
             spacing: root.px(10)
 
-            //? Chart band: fixed-compact (Item carries the layout attachment;
-            //? the grid fills it)
+            //? Top half — charts: bottom of panel reserved equally for
+            //? the stat half (stat grid + status bar scrolled out only
+            //? if the window's own minimum allows it)
             Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: root.px(235)
-                Layout.minimumHeight: root.px(170)
                 Layout.fillHeight: true
+                Layout.preferredHeight: root.px(120)
                 GridLayout {
                     anchors.fill: parent
                     columns: 2
@@ -297,12 +318,14 @@ Item {
                     WinTmGauge {
                         caption: qsTr("CPU Usage")
                         bars: root.coreBars()
+                        overlay: CpuMonitor.usage + " %"
                         Layout.preferredWidth: root.px(115)
                         Layout.fillHeight: true
                     }
                     WinTmGraph {
                         caption: qsTr("CPU Usage History")
                         samples: CpuMonitor.history
+                        overlay: CpuMonitor.usage + " %"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
@@ -310,6 +333,7 @@ Item {
                     WinTmGauge {
                         caption: qsTr("Memory Usage")
                         bars: root.memBars()
+                        overlay: root.mib(MemMonitor.used) + " MB"
                         Layout.preferredWidth: root.px(115)
                         Layout.fillHeight: true
                     }
@@ -319,20 +343,27 @@ Item {
                         series: MemMonitor.hasSwap
                                 ? [MemMonitor.history, MemMonitor.swapHistory] : []
                         seriesColors: MemMonitor.hasSwap ? [root.ink, root.ink] : []
+                        overlay: root.mib(MemMonitor.used) + " MB"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
                 }
             }
 
-            //? Stat cards — 2×2 grid, the panel's data area (content-sized,
-            //? never stretched or shrunk; the chart band absorbs the flex)
-            GridLayout {
+            //? Bottom half — stat grid fills it, status bar keeps natural height
+            ColumnLayout {
                 Layout.fillWidth: true
-                Layout.minimumHeight: implicitHeight
-                columns: 2
-                rowSpacing: root.px(10)
-                columnSpacing: root.px(10)
+                Layout.fillHeight: true
+                Layout.preferredHeight: root.px(120)
+                spacing: root.px(10)
+
+                //? Stat cards — 2×2 grid, fills the bottom half
+                GridLayout {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    columns: 2
+                    rowSpacing: root.px(10)
+                    columnSpacing: root.px(10)
 
                 WinTmStatBox {
                     caption: qsTr("Totals")
@@ -342,7 +373,7 @@ Item {
                         { "name": qsTr("Processes"), "value": ProcessModel.totalProcs }
                     ]
                     Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignTop
+                    Layout.fillHeight: true
                 }
                 WinTmStatBox {
                     caption: qsTr("Physical Memory (K)")
@@ -352,7 +383,7 @@ Item {
                         { "name": qsTr("System Cache"),"value": root.kib(MemMonitor.cached) }
                     ]
                     Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignTop
+                    Layout.fillHeight: true
                 }
                 WinTmStatBox {
                     caption: qsTr("Commit Charge (K)")
@@ -362,7 +393,7 @@ Item {
                         { "name": qsTr("Peak"),  "value": root.kib(MemMonitor.commitPeak) }
                     ]
                     Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignTop
+                    Layout.fillHeight: true
                 }
                 WinTmStatBox {
                     caption: qsTr("Kernel Memory (K)")
@@ -372,7 +403,7 @@ Item {
                         { "name": qsTr("Nonpaged"),"value": root.kib(MemMonitor.kernelSlab - MemMonitor.kernelReclaimable) }
                     ]
                     Layout.fillWidth: true
-                    Layout.alignment: Qt.AlignTop
+                    Layout.fillHeight: true
                 }
             }
 
@@ -388,6 +419,7 @@ Item {
                           .arg(root.mib(MemMonitor.commitAS))
                           .arg(root.mib(MemMonitor.commitLimit)), "fill": true }
                 ]
+            }
             }
         }
     }
