@@ -35,31 +35,28 @@ Item {
     readonly property color screen: "#10150f"
     readonly property color screenSofter: "#162016"
 
-    //? btop's Theme::g("cpu") analogue: lerp accentCpu -> accentHot by percent
-    function heatColor(pct) {
-        const t = Math.min(Math.max(pct, 0), 100) / 100.0
-        return Qt.rgba(
-            Theme.accentCpu.r + (Theme.accentHot.r - Theme.accentCpu.r) * t,
-            Theme.accentCpu.g + (Theme.accentHot.g - Theme.accentCpu.g) * t,
-            Theme.accentCpu.b + (Theme.accentHot.b - Theme.accentCpu.b) * t, 1)
+    //? OS accent (QPalette::Accent via SystemPalette) — the single ink for
+    //? every equalizer bar and history line; track the user's OS setting
+    SystemPalette {
+        id: osPalette
     }
+    readonly property color ink: osPalette.accent
 
-    //? CPU equalizer bars: one dict per core { "fraction": 0..1, "color": heat }
+    //? CPU equalizer bars: one fraction per core (color comes from root.ink)
     function coreBars() {
         const out = []
         for (let i = 0; i < CpuMonitor.perCore.length; ++i)
-            out.push({ "fraction": CpuMonitor.perCore[i] / 100.0,
-                       "color": root.heatColor(CpuMonitor.perCore[i]) })
+            out.push({ "fraction": CpuMonitor.perCore[i] / 100.0, "color": root.ink })
         return out
     }
 
     //? RAM/SWAP equalizer bars: RAM used + swap used (swap omitted when none)
     function memBars() {
         const ram = MemMonitor.total > 0 ? MemMonitor.used / MemMonitor.total : 0
-        const out = [{ "fraction": ram, "color": Theme.accentMem }]
+        const out = [{ "fraction": ram, "color": root.ink }]
         if (MemMonitor.hasSwap && MemMonitor.swapTotal > 0)
             out.push({ "fraction": MemMonitor.swapUsed / MemMonitor.swapTotal,
-                       "color": Theme.accentWarn })
+                       "color": root.ink })
         return out
     }
 
@@ -97,14 +94,11 @@ Item {
 
     //? Gauge: matrix screen; bar list as a column equalizer (narrow
     //? vertical bars); falls back to a single total level bar for scalar
-    //? data; value pinned at the bottom of the card flow
+    //? data; charts only — no value labels (numbers live in stat boxes)
     component WinTmGauge: WinTmCard {
         id: gaugeRoot
-        property string valueText
         property real fraction: 0.0
         property var bars: [] //? [{ "fraction": 0..1, "color": color }]; empty -> scalar fallback
-        property color valueColor: Theme.text
-        property color barColor: Theme.accentCpu
 
         WinTmScreen {
             Layout.fillWidth: true
@@ -168,17 +162,9 @@ Item {
                     width: parent.width * gaugeRoot.fraction
                     height: parent.height
                     radius: root.px(1)
-                    color: gaugeRoot.barColor
+                    color: root.ink
                 }
             }
-        }
-
-        Label {
-            text: gaugeRoot.valueText
-            Layout.alignment: Qt.AlignHCenter
-            font.bold: true
-            font.pixelSize: root.px(19)
-            color: gaugeRoot.valueColor
         }
     }
 
@@ -188,7 +174,7 @@ Item {
         property list<double> samples: []
         property list<var> series: []
         property list<color> seriesColors: []
-        property color lineColor: Theme.accentCpu
+        property color lineColor: root.ink
 
         WinTmScreen {
             Layout.fillWidth: true
@@ -310,8 +296,6 @@ Item {
 
                     WinTmGauge {
                         caption: qsTr("CPU Usage")
-                        valueText: CpuMonitor.usage + " %"
-                        valueColor: Theme.accentCpu
                         bars: root.coreBars()
                         Layout.preferredWidth: root.px(115)
                         Layout.fillHeight: true
@@ -319,15 +303,12 @@ Item {
                     WinTmGraph {
                         caption: qsTr("CPU Usage History")
                         samples: CpuMonitor.history
-                        lineColor: Theme.accentCpu
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
 
                     WinTmGauge {
                         caption: qsTr("Memory Usage")
-                        valueText: root.mib(MemMonitor.used) + " MB"
-                        valueColor: Theme.accentMem
                         bars: root.memBars()
                         Layout.preferredWidth: root.px(115)
                         Layout.fillHeight: true
@@ -337,9 +318,7 @@ Item {
                         samples: MemMonitor.history
                         series: MemMonitor.hasSwap
                                 ? [MemMonitor.history, MemMonitor.swapHistory] : []
-                        seriesColors: MemMonitor.hasSwap
-                                ? [Theme.accentMem, Theme.accentWarn] : []
-                        lineColor: Theme.accentMem
+                        seriesColors: MemMonitor.hasSwap ? [root.ink, root.ink] : []
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
