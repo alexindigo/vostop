@@ -148,7 +148,7 @@ Item {
                         //? Short centered dash — discrete column per bar, cores
                         //? never bleed into each other
                         const dashW = Math.min(slotW - root.px(2), root.px(10))
-                        const gx = i * slotW + (slotW - dashW) / 2
+                        const gx = i * slotW + (slotW - dashW) / 2 - 1
                         //? Always show at least the bottom dash
                         const litFrac = frac < 1 ? Math.max(frac, 1 - dashH / (height - off)) : 1
                         const level = height - litFrac * (height - off)
