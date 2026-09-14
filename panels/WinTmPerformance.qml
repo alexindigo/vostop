@@ -122,8 +122,8 @@ Item {
                 }
             }
 
-            //? Equalizer — lit LED dots per bar, snapped to the matrix
-            //? grid (columns of dots, lit from the bottom up to the level)
+            //? Equalizer — stacked horizontal dashes per bar (XP meter:
+            //? short segments lit from the bottom up to the level)
             Canvas {
                 id: eqCanvas
                 anchors.fill: parent
@@ -137,33 +137,25 @@ Item {
                     const n = bars.length
                     if (n === 0)
                         return
-                    const step = root.px(5)
-                    const dot = root.px(2)
+                    const vstep = root.px(5)
+                    const dashH = root.px(2)
                     const off = root.px(2)
                     const slotW = width / n
-                    //? Bar footprint must stay inside its own slot — clamp the
-                    //? *outer* dot pitch, then light every dot column inside it
-                    const halfFree = Math.max(0, (slotW - dot) / 2 - 1)
-                    const litHalf = Math.floor(halfFree / step)
-                    const litCols = Math.max(1, 2 * litHalf + 1)
                     for (let i = 0; i < n; ++i) {
                         const frac = Math.min(Math.max(bars[i].fraction, 0), 1)
                         if (frac <= 0)
                             continue
-                        const cx = (i + 0.5) * slotW
-                        let cols = []
-                        for (let c = -(litCols - 1) / 2; c <= (litCols - 1) / 2; ++c)
-                            cols.push(cx + c * step)
-                        //? Always show at least the bottom row of dots
-                        const litFrac = frac < 1 ? Math.max(frac, 1 - dot / (height - off)) : 1
+                        //? Short centered dash — discrete column per bar, cores
+                        //? never bleed into each other
+                        const dashW = Math.min(slotW - root.px(2), root.px(10))
+                        const gx = i * slotW + (slotW - dashW) / 2
+                        //? Always show at least the bottom dash
+                        const litFrac = frac < 1 ? Math.max(frac, 1 - dashH / (height - off)) : 1
                         const level = height - litFrac * (height - off)
                         ctx.fillStyle = bars[i].color
-                        for (const px of cols) {
-                            const gx = Math.min(Math.max(px, off), width - off - dot)
-                            for (let y = off; y + dot <= height; y += step) {
-                                if (y >= level)
-                                    ctx.fillRect(gx, y, dot, dot)
-                            }
+                        for (let y = off; y + dashH <= height; y += vstep) {
+                            if (y >= level)
+                                ctx.fillRect(gx, y, dashW, dashH)
                         }
                     }
                 }
