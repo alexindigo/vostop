@@ -142,23 +142,22 @@ Item {
                     const vstep = root.px(5)
                     const dashH = root.px(2)
                     const off = root.px(2)
-                    //? One dot column per bar, snapped onto the matrix grid:
-                    //? fractional positions weld adjacent bars into solids
-                    const step = root.px(5)
-                    const dot = root.px(2)
-                    const gridX = (i) => Math.round(i * width / n / step) * step
+                    const slotW = width / n
                     for (let i = 0; i < n; ++i) {
                         const frac = Math.min(Math.max(bars[i].fraction, 0), 1)
                         if (frac <= 0)
                             continue
-                        const gx = gridX(i) + Math.round((width / n - dot) / 2 / step) * step
+                        //? Wide dash per row (the "-" stack), nearly the
+                        //? full slot width — the 1901 reference look
+                        const dashW = Math.max(dashH, slotW - root.px(2))
+                        const gx = i * slotW + (slotW - dashW) / 2
                         //? Always show at least the bottom dash
                         const litFrac = frac < 1 ? Math.max(frac, 1 - dashH / (height - off)) : 1
                         const level = height - litFrac * (height - off)
                         ctx.fillStyle = bars[i].color
                         for (let y = off; y + dashH <= height; y += vstep) {
                             if (y >= level)
-                                ctx.fillRect(gx, y, dot, dashH)
+                                ctx.fillRect(gx, y, dashW, dashH)
                         }
                     }
                 }
