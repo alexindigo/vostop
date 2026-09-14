@@ -122,40 +122,69 @@ Item {
                 }
             }
 
-            //? Individual lines — fixed-width verticals centered in each slot
-            Item {
+            //? Equalizer — lit LED dots per bar, snapped to the matrix
+            //? grid (columns of dots, lit from the bottom up to the level)
+            Canvas {
+                id: eqCanvas
                 anchors.fill: parent
                 anchors.margins: root.px(4)
-                visible: gaugeRoot.bars.length > 0
-                Repeater {
-                    model: gaugeRoot.bars
-                    delegate: Item {
-                        id: coreCol
-                        required property var modelData
-                        required property int index
-                        readonly property int barCount: gaugeRoot.bars.length
-                        readonly property real lineW: root.px(2)
-                        width: parent.width / barCount
-                        height: parent.height
-                        x: index * width + (width - lineW) / 2
-                        Rectangle {
-                            anchors.bottom: parent.bottom
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            width: coreCol.lineW
-                            height: parent.height * coreCol.modelData.fraction
-                            color: coreCol.modelData.color
+                onWidthChanged: requestPaint()
+                onHeightChanged: requestPaint()
+                onPaint: {
+                    const ctx = getContext("2d")
+                    ctx.clearRect(0, 0, width, height)
+                    const bars = gaugeRoot.bars
+                    const n = bars.length
+                    if (n === 0)
+                        return
+                    const step = root.px(5)
+                    const dot = root.px(2)
+                    const off = root.px(2)
+                    const slotW = width / n
+                    //? Bar footprint must stay inside its own slot — clamp the
+                    //? *outer* dot pitch, then light every dot column inside it
+                    const halfFree = Math.max(0, (slotW - dot) / 2 - 1)
+                    const litHalf = Math.floor(halfFree / step)
+                    const litCols = Math.max(1, 2 * litHalf + 1)
+                    for (let i = 0; i < n; ++i) {
+                        const frac = Math.min(Math.max(bars[i].fraction, 0), 1)
+                        if (frac <= 0)
+                            continue
+                        const cx = (i + 0.5) * slotW
+                        let cols = []
+                        for (let c = -(litCols - 1) / 2; c <= (litCols - 1) / 2; ++c)
+                            cols.push(cx + c * step)
+                        //? Always show at least the bottom row of dots
+                        const litFrac = frac < 1 ? Math.max(frac, 1 - dot / (height - off)) : 1
+                        const level = height - litFrac * (height - off)
+                        ctx.fillStyle = bars[i].color
+                        for (const px of cols) {
+                            const gx = Math.min(Math.max(px, off), width - off - dot)
+                            for (let y = off; y + dot <= height; y += step) {
+                                if (y >= level)
+                                    ctx.fillRect(gx, y, dot, dot)
+                            }
                         }
                     }
                 }
             }
+            Connections {
+                target: gaugeRoot
+                function onBarsChanged() { eqCanvas.requestPaint() }
+            }
 
-            //? Ink overlay text inside the screen (top-left)
+            //? Ink overlay text inside the screen (top-left) — width-bound
+            //? and shrunk to fit, never leaves the screen
             Label {
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.margins: root.px(6)
+                width: parent.width - root.px(12)
+                elide: Text.ElideRight
+                fontSizeMode: Text.Fit
+                minimumPixelSize: 4
+                font.pixelSize: Math.min(root.px(12), Math.max(4, Math.round(parent.height * 0.20)))
                 text: gaugeRoot.overlay
-                font.pixelSize: root.px(12)
                 color: root.ink
             }
 
@@ -203,13 +232,18 @@ Item {
                 gridDivisions: 6
                 verticalDivisions: Math.max(1, Math.round(width / 26))
             }
-            //? Ink overlay text inside the screen (top-left)
+            //? Ink overlay text inside the screen (top-left) — width-bound
+            //? and shrunk to fit, never leaves the screen
             Label {
                 anchors.left: parent.left
                 anchors.top: parent.top
                 anchors.margins: root.px(6)
+                width: parent.width - root.px(12)
+                elide: Text.ElideRight
+                fontSizeMode: Text.Fit
+                minimumPixelSize: 4
+                font.pixelSize: Math.min(root.px(12), Math.max(4, Math.round(parent.height * 0.20)))
                 text: graphRoot.overlay
-                font.pixelSize: root.px(12)
                 color: root.ink
             }
         }
