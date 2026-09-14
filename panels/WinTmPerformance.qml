@@ -69,6 +69,7 @@ Item {
 
         color: root.card
         radius: root.px(8)
+        clip: true
         implicitWidth: cardBody.implicitWidth + root.px(20)
         implicitHeight: cardBody.implicitHeight + root.px(20)
 
@@ -82,6 +83,7 @@ Item {
                 text: cardBox.caption
                 font.pixelSize: root.px(13)
                 color: root.captionText
+                elide: Text.ElideRight
             }
         }
     }
@@ -242,8 +244,8 @@ Item {
         }
     }
 
-    //? Stat card: content-sized — compact fixed-pitch rows, card height
-    //? follows its content (never stretches)
+    //? Stat card: rows share the card height and shrink when squeezed —
+    //? no row is ever pushed under the status bar
     component WinTmStatBox: WinTmCard {
         id: statRoot
         property var entries: []
@@ -254,17 +256,31 @@ Item {
                 id: statRow
                 required property var modelData
                 Layout.fillWidth: true
-                Layout.preferredHeight: root.px(20)
+                Layout.fillHeight: true
+                Layout.preferredHeight: root.px(18)
+                Layout.minimumHeight: root.px(12)
+                clip: true
                 Label {
                     anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: parent.width * 0.45
+                    verticalAlignment: Text.AlignVCenter
+                    fontSizeMode: Text.Fit
+                    minimumPixelSize: 4
                     text: statRow.modelData.name
                     font.pixelSize: root.px(14)
                     color: root.faceText
                 }
                 Label {
                     anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: parent.width * 0.55
+                    horizontalAlignment: Text.AlignRight
+                    verticalAlignment: Text.AlignVCenter
+                    fontSizeMode: Text.Fit
+                    minimumPixelSize: 4
                     text: statRow.modelData.value
                     font.pixelSize: root.px(14)
                     color: root.faceText
@@ -377,16 +393,21 @@ Item {
                 }
             }
 
-            //? Bottom half — stat grid fills it, status bar keeps natural height
+            //? Bottom half — stat grid + status bar; same preferred size as
+            //? the chart band so the panel splits 50/50. The whole bottom
+            //? column is clip-bounded: stat grid is squeezed, status bar
+            //? keeps its natural height.
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 Layout.preferredHeight: root.px(120)
                 spacing: root.px(10)
+                clip: true
 
-                //? Stat cards — 2×2 grid, fills the bottom half
+                //? Stat cards — 2×2 grid; rows share card height and shrink
                 GridLayout {
                     Layout.fillWidth: true
+                    Layout.preferredHeight: 1
                     Layout.fillHeight: true
                     columns: 2
                     rowSpacing: root.px(10)
@@ -434,9 +455,11 @@ Item {
                 }
             }
 
-            //? Status bar — one bar, cells in the reference's proportions
+            //? Status bar — natural height, bottom-anchored, never covered
             WinTmStatusBar {
                 Layout.fillWidth: true
+                Layout.alignment: Qt.AlignBottom
+                Layout.preferredHeight: implicitHeight
                 Layout.minimumHeight: implicitHeight
                 Layout.maximumHeight: implicitHeight
                 cells: [
