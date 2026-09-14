@@ -151,9 +151,10 @@ Item {
                         //? full slot width — the 1901 reference look
                         const dashW = Math.max(dashH, slotW - root.px(2))
                         const gx = i * slotW + (slotW - dashW) / 2
-                        //? Always show at least the bottom dash
-                        const litFrac = frac < 1 ? Math.max(frac, 1 - dashH / (height - off)) : 1
-                        const level = height - litFrac * (height - off)
+                        //? Lit height = usage fraction; a non-zero bar always
+                        //? lights at least one dash
+                        const litH = Math.max(frac * (height - off), frac > 0 ? dashH + off : 0)
+                        const level = height - litH
                         ctx.fillStyle = bars[i].color
                         for (let y = off; y + dashH <= height; y += vstep) {
                             if (y >= level)
