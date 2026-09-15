@@ -108,7 +108,6 @@ Item {
                     visible: cardBox.value.length > 0
                     text: cardBox.value
                     font.pixelSize: root.px(13)
-                    font.bold: true
                     color: root.ink
                 }
             }
