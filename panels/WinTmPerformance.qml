@@ -50,6 +50,12 @@ Item {
         return Math.max(root.px(115), n * dots * root.px(5) + root.px(28))
     }
 
+    //? ONE width for both gauge cards — the wider of bar-fit and either
+    //? card's header content; CPU and Memory are always the same width
+    function gaugeRowWidth() {
+        return Math.max(root.gaugeWidth(), cpuGauge.implicitWidth, memGauge.implicitWidth)
+    }
+
     //? CPU equalizer bars: one fraction per core (color comes from root.ink)
     function coreBars() {
         const out = []
@@ -349,11 +355,11 @@ Item {
                     columnSpacing: root.px(10)
 
                     WinTmGauge {
+                        id: cpuGauge
                         caption: qsTr("CPU")
                         value: CpuMonitor.usage + " %"
                         bars: root.coreBars()
-                        Layout.preferredWidth: root.gaugeWidth()
-                        Layout.minimumWidth: implicitWidth
+                        Layout.preferredWidth: root.gaugeRowWidth()
                         Layout.fillHeight: true
                     }
                     WinTmGraph {
@@ -364,11 +370,11 @@ Item {
                     }
 
                     WinTmGauge {
+                        id: memGauge
                         caption: qsTr("Memory")
                         value: root.mib(MemMonitor.used) + " MB"
                         bars: root.memBars()
-                        Layout.preferredWidth: root.gaugeWidth()
-                        Layout.minimumWidth: implicitWidth
+                        Layout.preferredWidth: root.gaugeRowWidth()
                         Layout.fillHeight: true
                     }
                     WinTmGraph {
