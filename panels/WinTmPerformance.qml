@@ -42,6 +42,14 @@ Item {
     }
     readonly property color ink: osPalette.accent
 
+    //? Gauge card width: expand to fit bars at 2 dots/bar (up to 20 cores),
+    //? 1 dot/bar beyond that; CPU and Memory expand together
+    function gaugeWidth() {
+        const n = CpuMonitor.perCore.length
+        const dots = n > 20 ? 1 : 2
+        return Math.max(root.px(115), n * dots * root.px(5) + root.px(28))
+    }
+
     //? CPU equalizer bars: one fraction per core (color comes from root.ink)
     function coreBars() {
         const out = []
@@ -60,11 +68,13 @@ Item {
         return out
     }
 
-    //? Borderless card: header caption on top, content flows below it via
-    //? the layout — consumers never position against the caption by hand
+    //? Borderless card: header caption on top (optional right-aligned value
+    //? in ink), content flows below it via the layout — consumers never
+    //? position against the caption by hand
     component WinTmCard: Rectangle {
         id: cardBox
         property string caption
+        property string value: "" //? right-aligned header value ("" = hidden)
         default property alias content: cardBody.data
 
         color: root.card
@@ -79,11 +89,22 @@ Item {
             anchors.margins: root.px(10)
             spacing: root.px(6)
 
-            Label {
-                text: cardBox.caption
-                font.pixelSize: root.px(13)
-                color: root.captionText
-                elide: Text.ElideRight
+            RowLayout {
+                Layout.fillWidth: true
+                Label {
+                    Layout.fillWidth: true
+                    text: cardBox.caption
+                    font.pixelSize: root.px(13)
+                    color: root.captionText
+                    elide: Text.ElideRight
+                }
+                Label {
+                    visible: cardBox.value.length > 0
+                    text: cardBox.value
+                    font.pixelSize: root.px(13)
+                    font.bold: true
+                    color: root.ink
+                }
             }
         }
     }
@@ -101,7 +122,6 @@ Item {
         id: gaugeRoot
         property real fraction: 0.0
         property var bars: [] //? [{ "fraction": 0..1, "color": color }]; empty -> scalar fallback
-        property string overlay: "" //? ink text inside the screen (charts-only)
 
         WinTmScreen {
             Layout.fillWidth: true
@@ -168,21 +188,6 @@ Item {
                 function onBarsChanged() { eqCanvas.requestPaint() }
             }
 
-            //? Ink overlay text inside the screen (top-left) — width-bound
-            //? and shrunk to fit, never leaves the screen
-            Label {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.margins: root.px(6)
-                width: parent.width - root.px(12)
-                elide: Text.ElideRight
-                fontSizeMode: Text.Fit
-                minimumPixelSize: 4
-                font.pixelSize: Math.min(root.px(12), Math.max(4, Math.round(parent.height * 0.20)))
-                text: gaugeRoot.overlay
-                color: root.ink
-            }
-
             //? Total level bar (fallback for scalar data)
             Rectangle {
                 anchors.left: parent.left
@@ -210,7 +215,6 @@ Item {
         property list<var> series: []
         property list<color> seriesColors: []
         property color lineColor: root.ink
-        property string overlay: "" //? ink text inside the screen (top-left)
 
         WinTmScreen {
             Layout.fillWidth: true
@@ -226,20 +230,6 @@ Item {
                 gridColor: Qt.rgba(graphRoot.lineColor.r, graphRoot.lineColor.g, graphRoot.lineColor.b, 0.06) //? hairline
                 gridDivisions: 6
                 verticalDivisions: Math.max(1, Math.round(width / 26))
-            }
-            //? Ink overlay text inside the screen (top-left) — width-bound
-            //? and shrunk to fit, never leaves the screen
-            Label {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.margins: root.px(6)
-                width: parent.width - root.px(12)
-                elide: Text.ElideRight
-                fontSizeMode: Text.Fit
-                minimumPixelSize: 4
-                font.pixelSize: Math.min(root.px(12), Math.max(4, Math.round(parent.height * 0.20)))
-                text: graphRoot.overlay
-                color: root.ink
             }
         }
     }
@@ -359,34 +349,34 @@ Item {
                     columnSpacing: root.px(10)
 
                     WinTmGauge {
-                        caption: qsTr("CPU Usage")
+                        caption: qsTr("CPU")
+                        value: CpuMonitor.usage + " %"
                         bars: root.coreBars()
-                        overlay: CpuMonitor.usage + " %"
-                        Layout.preferredWidth: root.px(115)
+                        Layout.preferredWidth: root.gaugeWidth()
+                        Layout.minimumWidth: implicitWidth
                         Layout.fillHeight: true
                     }
                     WinTmGraph {
-                        caption: qsTr("CPU Usage History")
+                        caption: qsTr("CPU History")
                         samples: CpuMonitor.history
-                        overlay: CpuMonitor.usage + " %"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
 
                     WinTmGauge {
-                        caption: qsTr("Memory Usage")
+                        caption: qsTr("Memory")
+                        value: root.mib(MemMonitor.used) + " MB"
                         bars: root.memBars()
-                        overlay: root.mib(MemMonitor.used) + " MB"
-                        Layout.preferredWidth: root.px(115)
+                        Layout.preferredWidth: root.gaugeWidth()
+                        Layout.minimumWidth: implicitWidth
                         Layout.fillHeight: true
                     }
                     WinTmGraph {
-                        caption: qsTr("Memory Usage History")
+                        caption: qsTr("Memory History")
                         samples: MemMonitor.history
                         series: MemMonitor.hasSwap
                                 ? [MemMonitor.history, MemMonitor.swapHistory] : []
                         seriesColors: MemMonitor.hasSwap ? [root.ink, root.ink] : []
-                        overlay: root.mib(MemMonitor.used) + " MB"
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
