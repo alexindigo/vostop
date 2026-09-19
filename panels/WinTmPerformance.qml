@@ -409,11 +409,12 @@ Item {
                     columnSpacing: root.px(10)
 
                 WinTmStatBox {
-                    caption: qsTr("Totals")
+                    caption: qsTr("Memory")
                     entries: [
-                        { "name": qsTr("Handles"),   "value": CpuMonitor.handles },
-                        { "name": qsTr("Threads"),   "value": ProcessModel.threadsTotal },
-                        { "name": qsTr("Processes"), "value": ProcessModel.totalProcs }
+                        { "name": qsTr("Used:"),      "value": root.kib(MemMonitor.used) },
+                        { "name": qsTr("Available:"), "value": root.kib(MemMonitor.available) },
+                        { "name": qsTr("Cached:"),    "value": root.kib(MemMonitor.cached) },
+                        { "name": qsTr("Free:"),      "value": root.kib(MemMonitor.free) }
                     ]
                     Layout.fillWidth: true
                     Layout.fillHeight: true
