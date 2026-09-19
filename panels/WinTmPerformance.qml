@@ -92,6 +92,7 @@ Item {
         id: cardBox
         property string caption
         property string value: "" //? right-aligned header value ("" = hidden)
+        property int titleSize: root.px(13)
         default property alias content: cardBody.data
 
         color: root.card
@@ -111,7 +112,7 @@ Item {
                 Label {
                     Layout.fillWidth: true
                     text: cardBox.caption
-                    font.pixelSize: root.px(13)
+                    font.pixelSize: cardBox.titleSize
                     color: root.captionText
                     elide: Text.ElideRight
                 }
@@ -256,6 +257,7 @@ Item {
     component WinTmStatBox: WinTmCard {
         id: statRoot
         property var entries: []
+        titleSize: root.px(11)
 
         Repeater {
             model: statRoot.entries
@@ -272,6 +274,7 @@ Item {
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.bottom: meterTrack.top
+                    anchors.bottomMargin: root.px(2)
                     width: parent.width * 0.35
                     verticalAlignment: Text.AlignVCenter
                     fontSizeMode: Text.Fit
@@ -284,6 +287,7 @@ Item {
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.bottom: meterTrack.top
+                    anchors.bottomMargin: root.px(2)
                     width: parent.width * 0.65
                     horizontalAlignment: Text.AlignRight
                     verticalAlignment: Text.AlignVCenter
@@ -299,6 +303,7 @@ Item {
                     anchors.left: parent.left
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
+                    anchors.bottomMargin: root.px(2)
                     height: root.px(2)
                     color: root.screenSofter
                     radius: root.px(1)
