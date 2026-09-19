@@ -270,8 +270,27 @@ Item {
                 Layout.minimumHeight: root.px(12)
                 clip: true
 
+                //? Full line-height meter: light-grey track from the palette,
+                //? accent fill for the percentage, text on top
+                Rectangle {
+                    anchors.fill: parent
+                    visible: statRow.modelData.fraction !== undefined
+                    color: Theme.innerBg
+                    radius: root.px(2)
+                }
+                Rectangle {
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    visible: statRow.modelData.fraction !== undefined
+                    width: parent.width * (statRow.modelData.fraction ?? 0)
+                    color: root.ink
+                    radius: root.px(2)
+                }
+
                 Label {
                     anchors.left: parent.left
+                    anchors.leftMargin: root.px(4)
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     width: parent.width * 0.35
@@ -284,6 +303,7 @@ Item {
                 }
                 Label {
                     anchors.right: parent.right
+                    anchors.rightMargin: root.px(4)
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     width: parent.width * 0.65
@@ -426,10 +446,14 @@ Item {
                 WinTmStatBox {
                     caption: qsTr("Memory")
                     entries: [
-                        { "name": qsTr("Used:"),      "value": root.humanBytes(MemMonitor.used) + " (" + root.pct(MemMonitor.used, MemMonitor.total) + ")" },
-                        { "name": qsTr("Available:"), "value": root.humanBytes(MemMonitor.available) + " (" + root.pct(MemMonitor.available, MemMonitor.total) + ")" },
-                        { "name": qsTr("Cached:"),    "value": root.humanBytes(MemMonitor.cached) + " (" + root.pct(MemMonitor.cached, MemMonitor.total) + ")" },
-                        { "name": qsTr("Free:"),      "value": root.humanBytes(MemMonitor.free) + " (" + root.pct(MemMonitor.free, MemMonitor.total) + ")" }
+                        { "name": qsTr("Used:"),      "value": root.humanBytes(MemMonitor.used) + " (" + root.pct(MemMonitor.used, MemMonitor.total) + ")",
+                          "fraction": MemMonitor.total > 0 ? MemMonitor.used / MemMonitor.total : 0 },
+                        { "name": qsTr("Available:"), "value": root.humanBytes(MemMonitor.available) + " (" + root.pct(MemMonitor.available, MemMonitor.total) + ")",
+                          "fraction": MemMonitor.total > 0 ? MemMonitor.available / MemMonitor.total : 0 },
+                        { "name": qsTr("Cached:"),    "value": root.humanBytes(MemMonitor.cached) + " (" + root.pct(MemMonitor.cached, MemMonitor.total) + ")",
+                          "fraction": MemMonitor.total > 0 ? MemMonitor.cached / MemMonitor.total : 0 },
+                        { "name": qsTr("Free:"),      "value": root.humanBytes(MemMonitor.free) + " (" + root.pct(MemMonitor.free, MemMonitor.total) + ")",
+                          "fraction": MemMonitor.total > 0 ? MemMonitor.free / MemMonitor.total : 0 }
                     ]
                     Layout.fillWidth: true
                     Layout.fillHeight: true
