@@ -270,12 +270,12 @@ Item {
                 Layout.minimumHeight: root.px(12)
                 clip: true
 
-                //? Full line-height meter: light-grey track from the palette,
-                //? accent fill for the percentage, text on top
+                //? Full line-height meter: palette greys only — darker track,
+                //? light-grey fill for the percentage, text on top
                 Rectangle {
                     anchors.fill: parent
                     visible: statRow.modelData.fraction !== undefined
-                    color: Theme.innerBg
+                    color: Theme.detailBg
                     radius: root.px(2)
                 }
                 Rectangle {
@@ -284,7 +284,7 @@ Item {
                     anchors.bottom: parent.bottom
                     visible: statRow.modelData.fraction !== undefined
                     width: parent.width * (statRow.modelData.fraction ?? 0)
-                    color: root.ink
+                    color: Theme.innerBg
                     radius: root.px(2)
                 }
 
