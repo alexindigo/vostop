@@ -257,7 +257,7 @@ Item {
     component WinTmStatBox: WinTmCard {
         id: statRoot
         property var entries: []
-        titleSize: root.px(11)
+        titleSize: root.px(10)
 
         Repeater {
             model: statRoot.entries
@@ -273,46 +273,27 @@ Item {
                 Label {
                     anchors.left: parent.left
                     anchors.top: parent.top
-                    anchors.bottom: meterTrack.top
-                    anchors.bottomMargin: root.px(2)
+                    anchors.bottom: parent.bottom
                     width: parent.width * 0.35
                     verticalAlignment: Text.AlignVCenter
                     fontSizeMode: Text.Fit
                     minimumPixelSize: 4
                     text: statRow.modelData.name
-                    font.pixelSize: root.px(14)
+                    font.pixelSize: root.px(16)
                     color: root.faceText
                 }
                 Label {
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.bottom: meterTrack.top
-                    anchors.bottomMargin: root.px(2)
+                    anchors.bottom: parent.bottom
                     width: parent.width * 0.65
                     horizontalAlignment: Text.AlignRight
                     verticalAlignment: Text.AlignVCenter
                     fontSizeMode: Text.Fit
                     minimumPixelSize: 4
                     text: statRow.modelData.value
-                    font.pixelSize: root.px(14)
+                    font.pixelSize: root.px(16)
                     color: root.faceText
-                }
-                Rectangle {
-                    id: meterTrack
-                    visible: statRow.modelData.fraction !== undefined
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: root.px(2)
-                    height: root.px(2)
-                    color: root.screenSofter
-                    radius: root.px(1)
-                    Rectangle {
-                        width: meterTrack.width * (statRow.modelData.fraction ?? 0)
-                        height: parent.height
-                        radius: parent.radius
-                        color: root.ink
-                    }
                 }
             }
         }
@@ -445,14 +426,10 @@ Item {
                 WinTmStatBox {
                     caption: qsTr("Memory")
                     entries: [
-                        { "name": qsTr("Used:"),      "value": root.humanBytes(MemMonitor.used) + " (" + root.pct(MemMonitor.used, MemMonitor.total) + ")",
-                          "fraction": MemMonitor.total > 0 ? MemMonitor.used / MemMonitor.total : 0 },
-                        { "name": qsTr("Available:"), "value": root.humanBytes(MemMonitor.available) + " (" + root.pct(MemMonitor.available, MemMonitor.total) + ")",
-                          "fraction": MemMonitor.total > 0 ? MemMonitor.available / MemMonitor.total : 0 },
-                        { "name": qsTr("Cached:"),    "value": root.humanBytes(MemMonitor.cached) + " (" + root.pct(MemMonitor.cached, MemMonitor.total) + ")",
-                          "fraction": MemMonitor.total > 0 ? MemMonitor.cached / MemMonitor.total : 0 },
-                        { "name": qsTr("Free:"),      "value": root.humanBytes(MemMonitor.free) + " (" + root.pct(MemMonitor.free, MemMonitor.total) + ")",
-                          "fraction": MemMonitor.total > 0 ? MemMonitor.free / MemMonitor.total : 0 }
+                        { "name": qsTr("Used:"),      "value": root.humanBytes(MemMonitor.used) + " (" + root.pct(MemMonitor.used, MemMonitor.total) + ")" },
+                        { "name": qsTr("Available:"), "value": root.humanBytes(MemMonitor.available) + " (" + root.pct(MemMonitor.available, MemMonitor.total) + ")" },
+                        { "name": qsTr("Cached:"),    "value": root.humanBytes(MemMonitor.cached) + " (" + root.pct(MemMonitor.cached, MemMonitor.total) + ")" },
+                        { "name": qsTr("Free:"),      "value": root.humanBytes(MemMonitor.free) + " (" + root.pct(MemMonitor.free, MemMonitor.total) + ")" }
                     ]
                     Layout.fillWidth: true
                     Layout.fillHeight: true
