@@ -22,6 +22,17 @@ Item {
     function kib(b) { return Math.floor(b / 1024) }
     function mib(b) { return Math.floor(b / 1048576) }
 
+    //? btop-style humanizer: 1024-based, one decimal below 10 of a unit
+    function humanBytes(b) {
+        const units = ["B", "KB", "MB", "GB", "TB"]
+        let v = b, i = 0
+        while (v >= 1024 && i < units.length - 1) { v /= 1024; ++i }
+        return (v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)) + " " + units[i]
+    }
+    function pct(part, total) {
+        return total > 0 ? Math.round(part * 100 / total) + "%" : "—"
+    }
+
     //? Proportional unit: 1u = 1px in the 433px-wide reference screenshot
     readonly property real u: width / 431
     function px(v) { return Math.max(1, Math.round(v * u)) }
@@ -411,10 +422,10 @@ Item {
                 WinTmStatBox {
                     caption: qsTr("Memory")
                     entries: [
-                        { "name": qsTr("Used:"),      "value": root.kib(MemMonitor.used) },
-                        { "name": qsTr("Available:"), "value": root.kib(MemMonitor.available) },
-                        { "name": qsTr("Cached:"),    "value": root.kib(MemMonitor.cached) },
-                        { "name": qsTr("Free:"),      "value": root.kib(MemMonitor.free) }
+                        { "name": qsTr("Used:"),      "value": root.humanBytes(MemMonitor.used) + " (" + root.pct(MemMonitor.used, MemMonitor.total) + ")" },
+                        { "name": qsTr("Available:"), "value": root.humanBytes(MemMonitor.available) + " (" + root.pct(MemMonitor.available, MemMonitor.total) + ")" },
+                        { "name": qsTr("Cached:"),    "value": root.humanBytes(MemMonitor.cached) + " (" + root.pct(MemMonitor.cached, MemMonitor.total) + ")" },
+                        { "name": qsTr("Free:"),      "value": root.humanBytes(MemMonitor.free) + " (" + root.pct(MemMonitor.free, MemMonitor.total) + ")" }
                     ]
                     Layout.fillWidth: true
                     Layout.fillHeight: true
