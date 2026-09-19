@@ -251,7 +251,8 @@ Item {
     }
 
     //? Stat card: rows share the card height and shrink when squeezed —
-    //? no row is ever pushed under the status bar
+    //? no row is ever pushed under the status bar. Optional per-row meter:
+    //? entries may carry "fraction" (0..1) for a visual percentage bar
     component WinTmStatBox: WinTmCard {
         id: statRoot
         property var entries: []
@@ -266,11 +267,12 @@ Item {
                 Layout.preferredHeight: root.px(18)
                 Layout.minimumHeight: root.px(12)
                 clip: true
+
                 Label {
                     anchors.left: parent.left
                     anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    width: parent.width * 0.45
+                    anchors.bottom: meterTrack.top
+                    width: parent.width * 0.35
                     verticalAlignment: Text.AlignVCenter
                     fontSizeMode: Text.Fit
                     minimumPixelSize: 4
@@ -281,8 +283,8 @@ Item {
                 Label {
                     anchors.right: parent.right
                     anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    width: parent.width * 0.55
+                    anchors.bottom: meterTrack.top
+                    width: parent.width * 0.65
                     horizontalAlignment: Text.AlignRight
                     verticalAlignment: Text.AlignVCenter
                     fontSizeMode: Text.Fit
@@ -290,6 +292,22 @@ Item {
                     text: statRow.modelData.value
                     font.pixelSize: root.px(14)
                     color: root.faceText
+                }
+                Rectangle {
+                    id: meterTrack
+                    visible: statRow.modelData.fraction !== undefined
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    height: root.px(2)
+                    color: root.screenSofter
+                    radius: root.px(1)
+                    Rectangle {
+                        width: meterTrack.width * (statRow.modelData.fraction ?? 0)
+                        height: parent.height
+                        radius: parent.radius
+                        color: root.ink
+                    }
                 }
             }
         }
@@ -422,10 +440,14 @@ Item {
                 WinTmStatBox {
                     caption: qsTr("Memory")
                     entries: [
-                        { "name": qsTr("Used:"),      "value": root.humanBytes(MemMonitor.used) + " (" + root.pct(MemMonitor.used, MemMonitor.total) + ")" },
-                        { "name": qsTr("Available:"), "value": root.humanBytes(MemMonitor.available) + " (" + root.pct(MemMonitor.available, MemMonitor.total) + ")" },
-                        { "name": qsTr("Cached:"),    "value": root.humanBytes(MemMonitor.cached) + " (" + root.pct(MemMonitor.cached, MemMonitor.total) + ")" },
-                        { "name": qsTr("Free:"),      "value": root.humanBytes(MemMonitor.free) + " (" + root.pct(MemMonitor.free, MemMonitor.total) + ")" }
+                        { "name": qsTr("Used:"),      "value": root.humanBytes(MemMonitor.used) + " (" + root.pct(MemMonitor.used, MemMonitor.total) + ")",
+                          "fraction": MemMonitor.total > 0 ? MemMonitor.used / MemMonitor.total : 0 },
+                        { "name": qsTr("Available:"), "value": root.humanBytes(MemMonitor.available) + " (" + root.pct(MemMonitor.available, MemMonitor.total) + ")",
+                          "fraction": MemMonitor.total > 0 ? MemMonitor.available / MemMonitor.total : 0 },
+                        { "name": qsTr("Cached:"),    "value": root.humanBytes(MemMonitor.cached) + " (" + root.pct(MemMonitor.cached, MemMonitor.total) + ")",
+                          "fraction": MemMonitor.total > 0 ? MemMonitor.cached / MemMonitor.total : 0 },
+                        { "name": qsTr("Free:"),      "value": root.humanBytes(MemMonitor.free) + " (" + root.pct(MemMonitor.free, MemMonitor.total) + ")",
+                          "fraction": MemMonitor.total > 0 ? MemMonitor.free / MemMonitor.total : 0 }
                     ]
                     Layout.fillWidth: true
                     Layout.fillHeight: true
