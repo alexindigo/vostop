@@ -270,22 +270,35 @@ Item {
                 Layout.minimumHeight: root.px(12)
                 clip: true
 
-                //? Full line-height meter: palette greys only — darker track,
-                //? light-grey fill for the percentage, text on top
+                //? Full line-height meter: darker palette track, light-grey
+                //? tick segments for the percentage (same ticks as the
+                //? equalizer charts), text on top
                 Rectangle {
                     anchors.fill: parent
                     visible: statRow.modelData.fraction !== undefined
                     color: Theme.detailBg
                     radius: root.px(2)
                 }
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
+                Canvas {
+                    id: meterCanvas
+                    anchors.fill: parent
                     visible: statRow.modelData.fraction !== undefined
-                    width: parent.width * (statRow.modelData.fraction ?? 0)
-                    color: Theme.innerBg
-                    radius: root.px(2)
+                    property real frac: statRow.modelData.fraction ?? 0
+                    onFracChanged: requestPaint()
+                    onWidthChanged: requestPaint()
+                    onHeightChanged: requestPaint()
+                    onPaint: {
+                        const ctx = getContext("2d")
+                        ctx.clearRect(0, 0, width, height)
+                        if (frac <= 0)
+                            return
+                        const litW = width * Math.min(frac, 1)
+                        ctx.fillStyle = Theme.innerBg
+                        const tickW = root.px(2)
+                        const step = root.px(4)
+                        for (let x = 0; x + tickW <= litW; x += step)
+                            ctx.fillRect(x, 0, tickW, height)
+                    }
                 }
 
                 Label {
