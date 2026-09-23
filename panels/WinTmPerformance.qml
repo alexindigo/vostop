@@ -22,12 +22,21 @@ Item {
     function kib(b) { return Math.floor(b / 1024) }
     function mib(b) { return Math.floor(b / 1048576) }
 
-    //? btop-style humanizer: 1024-based, one decimal below 10 of a unit
-    function humanBytes(b) {
+    //? btop-style humanizer, split: number + unit separately so stat rows
+    //? can dim the unit (1024-based, one decimal below 10 of a unit)
+    function humanBytesParts(b) {
         const units = ["B", "KB", "MB", "GB", "TB"]
         let v = b, i = 0
         while (v >= 1024 && i < units.length - 1) { v /= 1024; ++i }
-        return (v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)) + " " + units[i]
+        return { "v": (v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)),
+                 "u": units[i] }
+    }
+
+    //? One stat-row entry with a byte value + fraction ring
+    function memEntry(name, bytes, total) {
+        const p = humanBytesParts(bytes)
+        return { "name": name, "value": p.v, "unit": p.u,
+                 "fraction": total > 0 ? bytes / total : 0 }
     }
     function pct(part, total) {
         return total > 0 ? Math.round(part * 100 / total) + "%" : "—"
@@ -52,6 +61,45 @@ Item {
         id: osPalette
     }
     readonly property color ink: osPalette.accent
+
+    //? Value units at 50% opacity
+    readonly property color unitTint: Qt.rgba(faceText.r, faceText.g, faceText.b, 0.5)
+
+    //? GPU stat rows, mirroring the Memory box: Usage / Memory Activity /
+    //? Power with fraction rings (mean %, summed W across devices) + VRAM
+    //? Used/Total; empty when no GPU data exists (box shows its emptyText)
+    function gpuEntries() {
+        const gpus = GpuMonitor.gpus
+        if (gpus.length === 0)
+            return []
+        let utilSum = 0, utilN = 0
+        let memUtilSum = 0, memUtilN = 0
+        let powerMw = 0, powerMaxMw = 0
+        let used = 0, total = 0
+        for (let i = 0; i < gpus.length; ++i) {
+            const g = gpus[i]
+            if (g.util >= 0) { utilSum += g.util; ++utilN }
+            if (g.memUtil >= 0) { memUtilSum += g.memUtil; ++memUtilN }
+            if (g.powerMw > 0) { powerMw += g.powerMw; powerMaxMw += g.powerMaxMw }
+            if (g.memTotal > 0) { used += g.memUsed; total += g.memTotal }
+        }
+        const out = []
+        if (utilN > 0)
+            out.push({ "name": qsTr("Usage:"), "value": Math.round(utilSum / utilN), "unit": "%",
+                       "fraction": Math.min(utilSum / utilN / 100, 1) })
+        if (memUtilN > 0)
+            out.push({ "name": qsTr("Memory Activity:"), "value": Math.round(memUtilSum / memUtilN), "unit": "%",
+                       "fraction": Math.min(memUtilSum / memUtilN / 100, 1) })
+        if (total > 0) {
+            const up = root.humanBytesParts(used)
+            out.push({ "name": qsTr("Memory:"), "value": up.v, "unit": up.u,
+                       "fraction": used / total })
+        }
+        if (powerMw > 0)
+            out.push({ "name": qsTr("Power:"), "value": (powerMw / 1000).toFixed(1), "unit": "W",
+                       "fraction": powerMaxMw > 0 ? Math.min(powerMw / powerMaxMw, 1) : 0 })
+        return out
+    }
 
     //? Gauge card width: expand to fit bars at 2 dots/bar (up to 20 cores),
     //? 1 dot/bar beyond that; CPU and Memory expand together
@@ -92,7 +140,8 @@ Item {
         id: cardBox
         property string caption
         property string value: "" //? right-aligned header value ("" = hidden)
-        property int titleSize: root.px(13)
+        property int titleSize: root.px(10)
+        readonly property int bodySpacing: root.px(6)
         default property alias content: cardBody.data
 
         color: root.card
@@ -105,12 +154,13 @@ Item {
             id: cardBody
             anchors.fill: parent
             anchors.margins: root.px(10)
-            spacing: root.px(6)
+            spacing: cardBox.bodySpacing
 
             RowLayout {
                 Layout.fillWidth: true
                 Label {
                     Layout.fillWidth: true
+                    Layout.alignment: Qt.AlignBaseline
                     text: cardBox.caption
                     font.pixelSize: cardBox.titleSize
                     color: root.captionText
@@ -118,8 +168,9 @@ Item {
                 }
                 Label {
                     visible: cardBox.value.length > 0
+                    Layout.alignment: Qt.AlignBaseline
                     text: cardBox.value
-                    font.pixelSize: root.px(13)
+                    font.pixelSize: root.px(8)
                     color: root.ink
                 }
             }
@@ -252,12 +303,26 @@ Item {
     }
 
     //? Stat card: rows share the card height and shrink when squeezed —
-    //? no row is ever pushed under the status bar. Optional per-row meter:
-    //? entries may carry "fraction" (0..1) for a visual percentage bar
+    //? no row is ever pushed under the status bar. Optional per-row ring:
+    //? entries may carry "fraction" (0..1) for a circular percentage icon;
+    //? entries may carry "unit" — drawn tight after the value at 50%
+    //? opacity. emptyText centers a note when there are no entries
     component WinTmStatBox: WinTmCard {
         id: statRoot
         property var entries: []
+        property string emptyText: ""
         titleSize: root.px(10)
+
+        Label {
+            visible: statRoot.entries.length === 0 && statRoot.emptyText.length > 0
+            text: statRoot.emptyText
+            color: Theme.textGhost
+            font.pixelSize: root.px(11)
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
 
         Repeater {
             model: statRoot.entries
@@ -270,40 +335,55 @@ Item {
                 Layout.minimumHeight: root.px(12)
                 clip: true
 
-                //? Full line-height meter: darker palette track, light-grey
-                //? tick segments for the percentage (same ticks as the
-                //? equalizer charts), text on top
-                Rectangle {
-                    anchors.fill: parent
-                    visible: statRow.modelData.fraction !== undefined
-                    color: Theme.detailBg
-                    radius: root.px(2)
-                }
+                //? Circular percentage icon in front of the row: palette
+                //? ring track + accent arc for the fraction
                 Canvas {
-                    id: meterCanvas
-                    anchors.fill: parent
+                    id: pctIcon
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: height
+                    height: Math.min(root.px(14), statRow.height - root.px(4))
                     visible: statRow.modelData.fraction !== undefined
                     property real frac: statRow.modelData.fraction ?? 0
                     onFracChanged: requestPaint()
+                    //? Canvas doesn't repaint on visibility/size changes by
+                    //? itself — the ring must redraw when the row appears
+                    //? or is resized, or it stays blank (startup race)
+                    onVisibleChanged: if (visible) requestPaint()
                     onWidthChanged: requestPaint()
                     onHeightChanged: requestPaint()
                     onPaint: {
                         const ctx = getContext("2d")
                         ctx.clearRect(0, 0, width, height)
+                        const lw = root.px(2)
+                        const r = Math.min(width, height) / 2 - lw / 2
+                        const cx = width / 2
+                        const cy = height / 2
+                        ctx.lineWidth = lw
+                        ctx.strokeStyle = Theme.innerBg
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, r, 0, 2 * Math.PI)
+                        ctx.stroke()
                         if (frac <= 0)
                             return
-                        const litW = width * Math.min(frac, 1)
-                        ctx.fillStyle = Theme.innerBg
-                        const tickW = root.px(2)
-                        const step = root.px(4)
-                        for (let x = 0; x + tickW <= litW; x += step)
-                            ctx.fillRect(x, 0, tickW, height)
+                        ctx.strokeStyle = root.ink
+                        ctx.lineCap = "round"
+                        ctx.beginPath()
+                        ctx.arc(cx, cy, r, -Math.PI / 2,
+                                -Math.PI / 2 + Math.min(frac, 1) * 2 * Math.PI)
+                        ctx.stroke()
                     }
                 }
 
                 Label {
-                    anchors.left: parent.left
-                    anchors.leftMargin: root.px(4)
+                    id: nameText
+                    //? Gap icon->label = half the visible distance between
+                    //? adjacent icons (row spacing + the row's slack around
+                    //? the ring); no icon -> flush with the row edge
+                    anchors.left: statRow.modelData.fraction !== undefined ? pctIcon.right : parent.left
+                    anchors.leftMargin: statRow.modelData.fraction !== undefined
+                                        ? (statRoot.bodySpacing + statRow.height - pctIcon.height) / 2
+                                        : root.px(4)
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     width: parent.width * 0.35
@@ -314,12 +394,16 @@ Item {
                     font.pixelSize: root.px(16)
                     color: root.faceText
                 }
+                //? value┊unit split: values right-align to the line, units
+                //? left-align from it (smaller, dimmed) — the line is the
+                //? same x for every row of the card
                 Label {
-                    anchors.right: parent.right
-                    anchors.rightMargin: root.px(4)
+                    id: valueText
+                    anchors.left: nameText.right
+                    anchors.right: unitText.left
+                    anchors.rightMargin: root.px(1)
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
-                    width: parent.width * 0.65
                     horizontalAlignment: Text.AlignRight
                     verticalAlignment: Text.AlignVCenter
                     fontSizeMode: Text.Fit
@@ -327,6 +411,19 @@ Item {
                     text: statRow.modelData.value
                     font.pixelSize: root.px(16)
                     color: root.faceText
+                }
+                Label {
+                    id: unitText
+                    anchors.right: parent.right
+                    anchors.rightMargin: root.px(4)
+                    anchors.baseline: valueText.baseline
+                    width: root.px(16)
+                    horizontalAlignment: Text.AlignLeft
+                    fontSizeMode: Text.Fit
+                    minimumPixelSize: 4
+                    text: statRow.modelData.unit ?? ""
+                    font.pixelSize: root.px(8)
+                    color: root.unitTint
                 }
             }
         }
@@ -449,35 +546,32 @@ Item {
 
                 //? Stat cards — 2×2 grid; rows share card height and shrink
                 GridLayout {
+                    id: statGrid
                     Layout.fillWidth: true
                     Layout.preferredHeight: 1
                     Layout.fillHeight: true
                     columns: 2
+                    //? All cells the same width — card widths never jump
+                    //? with the content
+                    uniformCellWidths: true
                     rowSpacing: root.px(10)
                     columnSpacing: root.px(10)
 
                 WinTmStatBox {
                     caption: qsTr("Memory")
                     entries: [
-                        { "name": qsTr("Used:"),      "value": root.humanBytes(MemMonitor.used) + " (" + root.pct(MemMonitor.used, MemMonitor.total) + ")",
-                          "fraction": MemMonitor.total > 0 ? MemMonitor.used / MemMonitor.total : 0 },
-                        { "name": qsTr("Available:"), "value": root.humanBytes(MemMonitor.available) + " (" + root.pct(MemMonitor.available, MemMonitor.total) + ")",
-                          "fraction": MemMonitor.total > 0 ? MemMonitor.available / MemMonitor.total : 0 },
-                        { "name": qsTr("Cached:"),    "value": root.humanBytes(MemMonitor.cached) + " (" + root.pct(MemMonitor.cached, MemMonitor.total) + ")",
-                          "fraction": MemMonitor.total > 0 ? MemMonitor.cached / MemMonitor.total : 0 },
-                        { "name": qsTr("Free:"),      "value": root.humanBytes(MemMonitor.free) + " (" + root.pct(MemMonitor.free, MemMonitor.total) + ")",
-                          "fraction": MemMonitor.total > 0 ? MemMonitor.free / MemMonitor.total : 0 }
+                        root.memEntry(qsTr("Used:"),      MemMonitor.used,      MemMonitor.total),
+                        root.memEntry(qsTr("Available:"), MemMonitor.available, MemMonitor.total),
+                        root.memEntry(qsTr("Cached:"),    MemMonitor.cached,    MemMonitor.total),
+                        root.memEntry(qsTr("Free:"),      MemMonitor.free,      MemMonitor.total)
                     ]
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                 }
                 WinTmStatBox {
-                    caption: qsTr("Physical Memory (K)")
-                    entries: [
-                        { "name": qsTr("Total"),       "value": root.kib(MemMonitor.total) },
-                        { "name": qsTr("Available"),   "value": root.kib(MemMonitor.available) },
-                        { "name": qsTr("System Cache"),"value": root.kib(MemMonitor.cached) }
-                    ]
+                    caption: qsTr("GPU")
+                    entries: root.gpuEntries()
+                    emptyText: qsTr("no supported GPU detected")
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                 }
