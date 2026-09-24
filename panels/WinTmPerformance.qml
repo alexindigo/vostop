@@ -18,8 +18,7 @@ Item {
     implicitWidth: flow.implicitWidth + root.px(20)
     implicitHeight: flow.implicitHeight + root.px(20)
 
-    //? XP-TM shows raw KiB digits
-    function kib(b) { return Math.floor(b / 1024) }
+    //? XP-TM shows raw MiB digits in the header value
     function mib(b) { return Math.floor(b / 1048576) }
 
     //? btop-style humanizer, split: number + unit separately so stat rows
@@ -45,6 +44,9 @@ Item {
     //? Proportional unit: 1u = 1px in the 433px-wide reference screenshot
     readonly property real u: width / 431
     function px(v) { return Math.max(1, Math.round(v * u)) }
+    //? Stat-row line height — FIXED, declared once: rows never stretch or
+    //? squeeze, pitch is identical in every box, air pools at card bottom
+    readonly property int statRowH: px(16)
 
     //? Soft palette — chrome and traces come from the app theme; screens
     //? stay dark (the display surface)
@@ -99,6 +101,88 @@ Item {
             out.push({ "name": qsTr("Power:"), "value": (powerMw / 1000).toFixed(1), "unit": "W",
                        "fraction": powerMaxMw > 0 ? Math.min(powerMw / powerMaxMw, 1) : 0 })
         return out
+    }
+
+    //? High-water ring scale for rates (session peak, 100 MB/s floor) —
+    //? the max for disk I/O, and the fallback for network when the link
+    //? speed is unknown (virtual ifaces report none)
+    property real peakRead: 100 * 1048576
+    property real peakWrite: 100 * 1048576
+    property real peakDown: 100 * 1048576
+    property real peakUp: 100 * 1048576
+
+    function updateDiskPeaks() {
+        let r = 0, w = 0
+        const mounts = DiskMonitor.mounts
+        for (let i = 0; i < mounts.length; ++i) {
+            r += mounts[i].ioRead
+            w += mounts[i].ioWrite
+        }
+        root.peakRead = Math.max(root.peakRead, r)
+        root.peakWrite = Math.max(root.peakWrite, w)
+    }
+
+    Connections {
+        target: DiskMonitor
+        function onMountsChanged() { root.updateDiskPeaks() }
+    }
+    Connections {
+        target: NetMonitor
+        function onNetChanged() {
+            root.peakDown = Math.max(root.peakDown, NetMonitor.downSpeed)
+            root.peakUp = Math.max(root.peakUp, NetMonitor.upSpeed)
+        }
+    }
+
+    //? Rate row: bytes/s humanized + fraction ring against the scale
+    function rateEntry(name, bytesPerSec, scale) {
+        const p = humanBytesParts(bytesPerSec)
+        return { "name": name, "value": p.v, "unit": p.u + "/s",
+                 "fraction": scale > 0 ? Math.min(bytesPerSec / scale, 1) : 0 }
+    }
+
+    //? Disk stat rows: root-fs usage with a ring, aggregate I/O rates,
+    //? busiest-device io activity % with a ring (btop's disk data points)
+    function diskEntries() {
+        const mounts = DiskMonitor.mounts
+        if (mounts.length === 0)
+            return []
+        let r = 0, w = 0, act = 0, rootUsed = 0, rootTotal = 0
+        for (let i = 0; i < mounts.length; ++i) {
+            const m = mounts[i]
+            r += m.ioRead
+            w += m.ioWrite
+            if (m.ioActivity > act)
+                act = m.ioActivity
+            if (m.mountpoint === "/") {
+                rootUsed = m.used
+                rootTotal = m.total
+            }
+        }
+        const out = []
+        if (rootTotal > 0) {
+            const p = root.humanBytesParts(rootUsed)
+            out.push({ "name": qsTr("Usage:"), "value": p.v, "unit": p.u,
+                       "fraction": rootUsed / rootTotal })
+        }
+        out.push(rateEntry(qsTr("Read:"),  r, root.peakRead))
+        out.push(rateEntry(qsTr("Write:"), w, root.peakWrite))
+        out.push({ "name": qsTr("Activity:"), "value": act, "unit": "%",
+                   "fraction": Math.min(act / 100, 1) })
+        return out
+    }
+
+    //? Network stat rows: down/up rates with rings against the link speed
+    //? (high-water estimate when the iface reports no link speed)
+    function netEntries() {
+        if (!NetMonitor.connected)
+            return []
+        const downScale = NetMonitor.linkSpeed > 0 ? NetMonitor.linkSpeed : root.peakDown
+        const upScale = NetMonitor.linkSpeed > 0 ? NetMonitor.linkSpeed : root.peakUp
+        return [
+            rateEntry(qsTr("Down:"), NetMonitor.downSpeed, downScale),
+            rateEntry(qsTr("Up:"),   NetMonitor.upSpeed,   upScale)
+        ]
     }
 
     //? Gauge card width: expand to fit bars at 2 dots/bar (up to 20 cores),
@@ -177,8 +261,11 @@ Item {
         }
     }
 
-    //? Soft-dark screen surface with the trace/grid content
+    //? Soft-dark screen surface with the trace/grid content. Natural
+    //? height feeds the implicit-size chain (card -> grid -> panel ->
+    //? window minimum), so the layout budget is always honest
     component WinTmScreen: Rectangle {
+        implicitHeight: root.px(50)
         color: root.screen
         radius: root.px(4)
     }
@@ -329,21 +416,24 @@ Item {
             delegate: Item {
                 id: statRow
                 required property var modelData
+                //? Fixed line height via implicitHeight — Layout attached
+                //? preferred/min/max are IGNORED on Repeater delegates
+                //? (verified); no fillHeight, so rows never stretch and
+                //? spare space pools at the card bottom
+                implicitHeight: root.statRowH
                 Layout.fillWidth: true
-                Layout.fillHeight: true
-                Layout.preferredHeight: root.px(18)
-                Layout.minimumHeight: root.px(12)
                 clip: true
 
-                //? Circular percentage icon in front of the row: palette
-                //? ring track + accent arc for the fraction
+                //? Icon slot in front of every row: the circular
+                //? percentage ring (palette track + accent arc); rows
+                //? without a fraction leave the slot empty — the label
+                //? indent is identical either way
                 Canvas {
                     id: pctIcon
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     width: height
-                    height: Math.min(root.px(14), statRow.height - root.px(4))
-                    visible: statRow.modelData.fraction !== undefined
+                    height: Math.min(root.px(10), statRow.height - root.px(4))
                     property real frac: statRow.modelData.fraction ?? 0
                     onFracChanged: requestPaint()
                     //? Canvas doesn't repaint on visibility/size changes by
@@ -355,6 +445,8 @@ Item {
                     onPaint: {
                         const ctx = getContext("2d")
                         ctx.clearRect(0, 0, width, height)
+                        if (statRow.modelData.fraction === undefined)
+                            return  //? empty slot
                         const lw = root.px(2)
                         const r = Math.min(width, height) / 2 - lw / 2
                         const cx = width / 2
@@ -379,11 +471,9 @@ Item {
                     id: nameText
                     //? Gap icon->label = half the visible distance between
                     //? adjacent icons (row spacing + the row's slack around
-                    //? the ring); no icon -> flush with the row edge
-                    anchors.left: statRow.modelData.fraction !== undefined ? pctIcon.right : parent.left
-                    anchors.leftMargin: statRow.modelData.fraction !== undefined
-                                        ? (statRoot.bodySpacing + statRow.height - pctIcon.height) / 2
-                                        : root.px(4)
+                    //? the icon slot); identical for ring and bullet rows
+                    anchors.left: pctIcon.right
+                    anchors.leftMargin: (statRoot.bodySpacing + statRow.height - pctIcon.height) / 2
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     width: parent.width * 0.35
@@ -391,7 +481,7 @@ Item {
                     fontSizeMode: Text.Fit
                     minimumPixelSize: 4
                     text: statRow.modelData.name
-                    font.pixelSize: root.px(16)
+                    font.pixelSize: root.px(10)
                     color: root.faceText
                 }
                 //? value┊unit split: values right-align to the line, units
@@ -409,7 +499,7 @@ Item {
                     fontSizeMode: Text.Fit
                     minimumPixelSize: 4
                     text: statRow.modelData.value
-                    font.pixelSize: root.px(16)
+                    font.pixelSize: root.px(10)
                     color: root.faceText
                 }
                 Label {
@@ -427,6 +517,9 @@ Item {
                 }
             }
         }
+        //? Owns the leftover card height — without it the layout
+        //? spreads the spare space between the rows
+        Item { Layout.fillHeight: true }
     }
 
     //? Status bar: ONE surface with cells separated by dividers
@@ -485,14 +578,15 @@ Item {
             anchors.margins: Math.max(0, root.px(10) - 8)
             spacing: root.px(10)
 
-            //? Top half — charts: bottom of panel reserved equally for
-            //? the stat half (stat grid + status bar scrolled out only
-            //? if the window's own minimum allows it)
+            //? Charts band — preferred height is the content's implicit
+            //? height, not a magic number: the panel budget derives from
+            //? what the cards actually contain
             Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.preferredHeight: root.px(120)
+                Layout.preferredHeight: chartGrid.implicitHeight
                 GridLayout {
+                    id: chartGrid
                     anchors.fill: parent
                     columns: 2
                     rowSpacing: root.px(10)
@@ -533,14 +627,13 @@ Item {
                 }
             }
 
-            //? Bottom half — stat grid + status bar; same preferred size as
-            //? the chart band so the panel splits 50/50. The whole bottom
-            //? column is clip-bounded: stat grid is squeezed, status bar
-            //? keeps its natural height.
+            //? Bottom band — stat grid + status bar; preferred height is
+            //? the content's implicit height (the layout's own), so the
+            //? split between bands follows what the cards contain
             ColumnLayout {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                Layout.preferredHeight: root.px(120)
+                Layout.preferredHeight: implicitHeight
                 spacing: root.px(10)
                 clip: true
 
@@ -548,7 +641,6 @@ Item {
                 GridLayout {
                     id: statGrid
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 1
                     Layout.fillHeight: true
                     columns: 2
                     //? All cells the same width — card widths never jump
@@ -576,22 +668,16 @@ Item {
                     Layout.fillHeight: true
                 }
                 WinTmStatBox {
-                    caption: qsTr("Commit Charge (K)")
-                    entries: [
-                        { "name": qsTr("Total"), "value": root.kib(MemMonitor.commitAS) },
-                        { "name": qsTr("Limit"), "value": root.kib(MemMonitor.commitLimit) },
-                        { "name": qsTr("Peak"),  "value": root.kib(MemMonitor.commitPeak) }
-                    ]
+                    caption: qsTr("Disk")
+                    entries: root.diskEntries()
+                    emptyText: qsTr("no mounts")
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                 }
                 WinTmStatBox {
-                    caption: qsTr("Kernel Memory (K)")
-                    entries: [
-                        { "name": qsTr("Total"),   "value": root.kib(MemMonitor.kernelSlab) },
-                        { "name": qsTr("Paged"),   "value": root.kib(MemMonitor.kernelReclaimable) },
-                        { "name": qsTr("Nonpaged"),"value": root.kib(MemMonitor.kernelSlab - MemMonitor.kernelReclaimable) }
-                    ]
+                    caption: qsTr("Network")
+                    entries: root.netEntries()
+                    emptyText: qsTr("not connected")
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                 }
