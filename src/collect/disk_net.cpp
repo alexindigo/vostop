@@ -612,6 +612,14 @@ namespace Net {
 				if (netif.ipv4.empty() and netif.ipv6.empty())
 					netif.ipv4 = readfile("/sys/class/net/" + iface + "/address");
 
+				//? Link speed (sysfs Mb/s -> B/s; virtual ifaces report -1 or nothing -> 0)
+				try {
+					const long mbps = stol(readfile("/sys/class/net/" + iface + "/speed", "0"));
+					netif.link_speed = mbps > 0 ? static_cast<uint64_t>(mbps) * 125000 : 0;
+				}
+				catch (const std::invalid_argument&) {}
+				catch (const std::out_of_range&) {}
+
 				for (const string dir : {"download", "upload"}) {
 					const fs::path sys_file = "/sys/class/net/" + iface + "/statistics/" + (dir == "download" ? "rx_bytes" : "tx_bytes");
 					auto& saved_stat = netif.stat.at(dir);

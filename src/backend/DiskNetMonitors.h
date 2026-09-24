@@ -67,6 +67,7 @@ class NetMonitor : public QObject {
 	Q_PROPERTY(bool connected READ connected NOTIFY netChanged FINAL)
 	Q_PROPERTY(qint64 downSpeed READ downSpeed NOTIFY netChanged FINAL)
 	Q_PROPERTY(qint64 upSpeed READ upSpeed NOTIFY netChanged FINAL)
+	Q_PROPERTY(qint64 linkSpeed READ linkSpeed NOTIFY netChanged FINAL)
 	Q_PROPERTY(qint64 downTotal READ downTotal NOTIFY netChanged FINAL)
 	Q_PROPERTY(qint64 upTotal READ upTotal NOTIFY netChanged FINAL)
 	Q_PROPERTY(QList<double> downHistory READ downHistory NOTIFY historyChanged FINAL)
@@ -88,6 +89,7 @@ public:
 	bool connected() const { return m_connected; }
 	qint64 downSpeed() const { return m_downSpeed; }
 	qint64 upSpeed() const { return m_upSpeed; }
+	qint64 linkSpeed() const { return m_linkSpeed; }
 	qint64 downTotal() const { return m_downTotal; }
 	qint64 upTotal() const { return m_upTotal; }
 	QList<double> downHistory() const { return m_downHistory; }
@@ -108,6 +110,6 @@ private:
 	QString m_iface, m_ipv4, m_ipv6;
 	QStringList m_ifaces;
 	bool m_connected = false;
-	qint64 m_downSpeed = 0, m_upSpeed = 0, m_downTotal = 0, m_upTotal = 0;
+	qint64 m_downSpeed = 0, m_upSpeed = 0, m_linkSpeed = 0, m_downTotal = 0, m_upTotal = 0;
 	QList<double> m_downHistory, m_upHistory;
 };

@@ -115,6 +115,7 @@ struct NetSnapshot {
 	bool connected = false;
 	qint64 downSpeed = 0, upSpeed = 0;   //? bytes/s
 	qint64 downTotal = 0, upTotal = 0;
+	qint64 linkSpeed = 0;                //? link rate bytes/s (0 = unknown, e.g. virtual iface)
 	QList<double> downHistory;           //? ring, oldest → newest
 	QList<double> upHistory;
 };

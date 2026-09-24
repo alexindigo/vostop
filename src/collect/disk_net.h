@@ -80,6 +80,9 @@ namespace Net {
 		std::string ipv4{};
 		std::string ipv6{};
 		bool connected{};
+		//? Link speed in B/s from /sys/class/net/<iface>/speed (0 = unknown,
+		//? e.g. virtual interfaces report -1 or nothing)
+		uint64_t link_speed{};
 	};
 
 	class IfAddrsPtr {

@@ -100,6 +100,7 @@ void NetMonitor::update(const NetSnapshot& snapshot) {
 	bool changed = m_iface != snapshot.iface or m_ipv4 != snapshot.ipv4 or m_ipv6 != snapshot.ipv6
 		or m_connected != snapshot.connected
 		or m_downSpeed != snapshot.downSpeed or m_upSpeed != snapshot.upSpeed
+		or m_linkSpeed != snapshot.linkSpeed
 		or m_downTotal != snapshot.downTotal or m_upTotal != snapshot.upTotal;
 	if (changed) {
 		m_iface = snapshot.iface;
@@ -108,6 +109,7 @@ void NetMonitor::update(const NetSnapshot& snapshot) {
 		m_connected = snapshot.connected;
 		m_downSpeed = snapshot.downSpeed;
 		m_upSpeed = snapshot.upSpeed;
+		m_linkSpeed = snapshot.linkSpeed;
 		m_downTotal = snapshot.downTotal;
 		m_upTotal = snapshot.upTotal;
 		emit netChanged();

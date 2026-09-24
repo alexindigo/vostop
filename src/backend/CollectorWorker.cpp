@@ -288,8 +288,9 @@ void CollectorWorker::tick() { //? tick counter for slow cadences (fdinfo walk e
 			ns.ipv4 = QString::fromStdString(n.ipv4);
 			ns.ipv6 = QString::fromStdString(n.ipv6);
 			ns.connected = n.connected;
-			ns.downSpeed = static_cast<qint64>(n.stat.at("download").speed);
-			ns.upSpeed = static_cast<qint64>(n.stat.at("upload").speed);
+		ns.downSpeed = static_cast<qint64>(n.stat.at("download").speed);
+		ns.upSpeed = static_cast<qint64>(n.stat.at("upload").speed);
+		ns.linkSpeed = static_cast<qint64>(n.link_speed);
 			ns.downTotal = static_cast<qint64>(n.stat.at("download").total);
 			ns.upTotal = static_cast<qint64>(n.stat.at("upload").total);
 			for (const long long v : n.bandwidth.at("download"))
