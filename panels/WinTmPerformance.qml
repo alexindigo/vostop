@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Vostop
+import Top
 
 //? XP Task Manager Performance tab — modernized: borderless rounded cards on
 //? the theme's window background (no bevels), soft surfaces, LED-matrix

@@ -3,6 +3,8 @@
  */
 #include "Settings.h"
 
+#include <topqml/TopConfig.h>
+
 #include <QSettings>
 #include <QQmlEngine>
 #include <QLoggingCategory>
@@ -38,6 +40,14 @@ void Settings::loadCache() {
 	SETTINGS_DSL
 #undef X
 	m_lock.unlock();
+	//? Mirror every key into TopConfig (the library persists nothing — vostop
+	//? owns persistence and forwards values collector-side; identical DSL
+	//? shape on both sides, one macro line covers all 38 keys)
+	auto* top = TopConfig::instance();
+	QReadLocker lock(&m_lock);
+#define X(type, Name, key, def) top->set_##Name(m_cache.value(QStringLiteral(key)).value<type>());
+	SETTINGS_DSL
+#undef X
 }
 
 void Settings::persist(const char* key, const QVariant& v) {
@@ -65,7 +75,8 @@ QString Settings::getS(const QString& key) {
 			m_cache.insert(QStringLiteral(key), QVariant::fromValue<type>(v)); \
 		} \
 		persist(key, QVariant::fromValue<type>(v)); \
+		TopConfig::instance()->set_##Name(v); \
 		emit Name##Changed(); \
 	}
-SETTINGS_DSL
+	SETTINGS_DSL
 #undef X
