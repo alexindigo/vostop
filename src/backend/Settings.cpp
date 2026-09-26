@@ -39,6 +39,9 @@ void Settings::loadCache() {
 	if (not m_cache.contains(QStringLiteral(key))) m_cache.insert(QStringLiteral(key), QVariant::fromValue<type>(def));
 	SETTINGS_DSL
 #undef X
+	//? vostop-only defaults (no TopConfig counterpart — see Settings.h)
+	if (not m_cache.contains(QStringLiteral("net_hide_docker")))
+		m_cache.insert(QStringLiteral("net_hide_docker"), QVariant::fromValue<bool>(true));
 	m_lock.unlock();
 	//? Mirror every key into TopConfig (the library persists nothing — vostop
 	//? owns persistence and forwards values collector-side; identical DSL
@@ -80,3 +83,15 @@ QString Settings::getS(const QString& key) {
 	}
 	SETTINGS_DSL
 #undef X
+
+//? Standalone setter — same cache/persist/emit shape as the DSL setters,
+//? but NO TopConfig forwarding (display-only pref, unknown to the library)
+void Settings::set_netHideDocker(const bool& v) {
+	{
+		QWriteLocker lock(&m_lock);
+		if (m_cache.value(QStringLiteral("net_hide_docker")).value<bool>() == v) return;
+		m_cache.insert(QStringLiteral("net_hide_docker"), QVariant::fromValue<bool>(v));
+	}
+	persist("net_hide_docker", QVariant::fromValue<bool>(v));
+	emit netHideDockerChanged();
+}

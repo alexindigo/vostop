@@ -67,6 +67,12 @@ class Settings : public QObject {
 	SETTINGS_DSL
 #undef X
 
+	//? vostop-only display prefs — standalone properties OUTSIDE the DSL:
+	//? loadCache/setters forward every DSL key into TopConfig::set_##Name,
+	//? and these keys don't exist library-side (DSL membership = compile
+	//? break). The collector never sees them; vostop persists them itself.
+	Q_PROPERTY(bool netHideDocker READ netHideDocker WRITE set_netHideDocker NOTIFY netHideDockerChanged FINAL)
+
 public:
 	static Settings* instance();
 
@@ -83,10 +89,15 @@ public:
 	SETTINGS_DSL
 #undef X
 
+	bool netHideDocker() const { return m_cache.value(QStringLiteral("net_hide_docker")).value<bool>(); }
+	void set_netHideDocker(const bool& v);
+
 signals:
 #define X(type, Name, key, def) void Name##Changed();
 	SETTINGS_DSL
 #undef X
+
+	void netHideDockerChanged();
 
 private:
 	explicit Settings(QObject* parent = nullptr);
