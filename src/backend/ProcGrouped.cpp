@@ -3,9 +3,10 @@
  */
 #include "ProcGrouped.h"
 
-#include "ProcessModel.h"
 #include "Settings.h"
-#include "../collect/proc.h"
+
+#include <topqml/ProcessModel.h>
+#include <topqml/ProcFilterProxyModel.h>
 
 #include <QLoggingCategory>
 #include <QQmlEngine>
@@ -50,7 +51,7 @@ bool ProcCategoryProxy::filterAcceptsRow(int sourceRow, const QModelIndex& sourc
 	const auto name = model->data(idx, ProcessModel::NameRole).toString();
 	const auto cmd = model->data(idx, ProcessModel::CmdRole).toString();
 	const auto user = model->data(idx, ProcessModel::UserRole).toString();
-	return Proc::matches_filter_row(pid, name.toStdString(), cmd.toStdString(),
+	return ProcFilterProxyModel::matchesFilterRow(pid, name.toStdString(), cmd.toStdString(),
 		user.toStdString(), m_sectionFilter.toStdString());
 }
 

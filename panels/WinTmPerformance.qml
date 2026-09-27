@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Vostop
+import Top
 
 //? XP Task Manager Performance tab — modernized: borderless rounded cards on
 //? the theme's window background (no bevels), soft surfaces, LED-matrix
@@ -103,13 +104,18 @@ Item {
         return out
     }
 
-    //? High-water ring scale for rates (session peak, 100 MB/s floor) —
-    //? the max for disk I/O, and the fallback for network when the link
-    //? speed is unknown (virtual ifaces report none)
+    //? High-water ring scale for disk rates (session peak, 100 MB/s floor)
     property real peakRead: 100 * 1048576
     property real peakWrite: 100 * 1048576
-    property real peakDown: 100 * 1048576
-    property real peakUp: 100 * 1048576
+
+    //? Active network interfaces (same display decision as NetCard:
+    //? connected + assigned ip, no loopback, docker0's 172.17.0.0/16 hidden
+    //? while netHideDocker is on) — rebuilt on the model's per-tick reset
+    property var netRows: []
+    //? Per-iface session peaks, keyed by iface name — the ring-scale
+    //? fallback when an iface reports no link speed (virtual ifaces report
+    //? none); same 100 MB/s floor as the disk peaks
+    property var netPeaks: ({})
 
     function updateDiskPeaks() {
         let r = 0, w = 0
@@ -126,13 +132,61 @@ Item {
         target: DiskMonitor
         function onMountsChanged() { root.updateDiskPeaks() }
     }
-    Connections {
-        target: NetMonitor
-        function onNetChanged() {
-            root.peakDown = Math.max(root.peakDown, NetMonitor.downSpeed)
-            root.peakUp = Math.max(root.peakUp, NetMonitor.upSpeed)
-        }
+
+    function isActiveIface(row) {
+        if (!row.connected)
+            return false
+        if (row.ipv4.length === 0 && row.ipv6.length === 0)
+            return false
+        if (row.name === "lo")
+            return false
+        if (Settings.netHideDocker && row.ipv4.startsWith("172.17."))
+            return false
+        return true
     }
+
+    //? Rebuild the filtered iface rows and fold the tick's rates into the
+    //? per-iface session peaks (a fresh map each tick so bindings re-fire)
+    function rebuildNet() {
+        const m = NetIfacesModel
+        const out = []
+        const peaks = {}
+        const old = root.netPeaks
+        for (const k in old)
+            peaks[k] = old[k]
+        for (let i = 0; i < m.rowCount(); ++i) {
+            const idx = m.index(i, 0)
+            const row = {
+                "name": m.data(idx, NetIfacesModel.NameRole),
+                "ipv4": m.data(idx, NetIfacesModel.Ipv4Role),
+                "ipv6": m.data(idx, NetIfacesModel.Ipv6Role),
+                "connected": m.data(idx, NetIfacesModel.ConnectedRole),
+                "linkSpeed": m.data(idx, NetIfacesModel.LinkSpeedRole),
+                "downSpeed": m.data(idx, NetIfacesModel.DownSpeedRole),
+                "upSpeed": m.data(idx, NetIfacesModel.UpSpeedRole)
+            }
+            if (!root.isActiveIface(row))
+                continue
+            const p = peaks[row.name] ?? { "down": 100 * 1048576, "up": 100 * 1048576 }
+            peaks[row.name] = {
+                "down": Math.max(p.down, row.downSpeed),
+                "up": Math.max(p.up, row.upSpeed)
+            }
+            out.push(row)
+        }
+        root.netPeaks = peaks
+        root.netRows = out
+    }
+
+    Connections {
+        target: NetIfacesModel
+        function onModelReset() { root.rebuildNet() }
+    }
+    Connections {
+        target: Settings
+        function onNetHideDockerChanged() { root.rebuildNet() }
+    }
+    Component.onCompleted: root.rebuildNet()
 
     //? Rate row: bytes/s humanized + fraction ring against the scale
     function rateEntry(name, bytesPerSec, scale) {
@@ -172,17 +226,20 @@ Item {
         return out
     }
 
-    //? Network stat rows: down/up rates with rings against the link speed
-    //? (high-water estimate when the iface reports no link speed)
+    //? Network stat rows: per active iface, down/up rates with rings against
+    //? that iface's link speed (its per-iface session peak when it reports
+    //? none). Variable row count fits the top-packed stat-box layout.
     function netEntries() {
-        if (!NetMonitor.connected)
-            return []
-        const downScale = NetMonitor.linkSpeed > 0 ? NetMonitor.linkSpeed : root.peakDown
-        const upScale = NetMonitor.linkSpeed > 0 ? NetMonitor.linkSpeed : root.peakUp
-        return [
-            rateEntry(qsTr("Down:"), NetMonitor.downSpeed, downScale),
-            rateEntry(qsTr("Up:"),   NetMonitor.upSpeed,   upScale)
-        ]
+        const out = []
+        for (let i = 0; i < root.netRows.length; ++i) {
+            const r = root.netRows[i]
+            const peak = root.netPeaks[r.name] ?? { "down": 100 * 1048576, "up": 100 * 1048576 }
+            const downScale = r.linkSpeed > 0 ? r.linkSpeed : peak.down
+            const upScale = r.linkSpeed > 0 ? r.linkSpeed : peak.up
+            out.push(rateEntry(qsTr("%1 Down:").arg(r.name), r.downSpeed, downScale))
+            out.push(rateEntry(qsTr("%1 Up:").arg(r.name), r.upSpeed, upScale))
+        }
+        return out
     }
 
     //? Gauge card width: expand to fit bars at 2 dots/bar (up to 20 cores),

@@ -1,7 +1,10 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Vostop
+import Top
 
 Rectangle {
     id: root
@@ -23,80 +26,149 @@ Rectangle {
         return bps.toFixed(0) + " B/s"
     }
 
+    //? Active interfaces (user display decision 2026-09-25): connected, an
+    //? assigned IPv4/IPv6, not loopback; the 172.17.0.0/16 range (docker0's)
+    //? is hidden while the persisted netHideDocker toggle is on. Rebuilt on
+    //? the model's per-tick reset — the row count is tiny, a JS walk is fine.
+    property var netRows: []
+    //? Graphs stick to one iface by name while it stays in the filtered set
+    //? (first row otherwise), so quiet ifaces don't flip the history
+    property string shownIface: ""
+    property var shownRow: null
+
+    function isActiveIface(row) {
+        if (!row.connected)
+            return false
+        if (row.ipv4.length === 0 && row.ipv6.length === 0)
+            return false
+        if (row.name === "lo")
+            return false
+        if (Settings.netHideDocker && row.ipv4.startsWith("172.17."))
+            return false
+        return true
+    }
+
+    function rebuildNet() {
+        const m = NetIfacesModel
+        const out = []
+        for (let i = 0; i < m.rowCount(); ++i) {
+            const idx = m.index(i, 0)
+            const row = {
+                "name": m.data(idx, NetIfacesModel.NameRole),
+                "ipv4": m.data(idx, NetIfacesModel.Ipv4Role),
+                "ipv6": m.data(idx, NetIfacesModel.Ipv6Role),
+                "connected": m.data(idx, NetIfacesModel.ConnectedRole),
+                "downSpeed": m.data(idx, NetIfacesModel.DownSpeedRole),
+                "upSpeed": m.data(idx, NetIfacesModel.UpSpeedRole),
+                "downTotal": m.data(idx, NetIfacesModel.DownTotalRole),
+                "upTotal": m.data(idx, NetIfacesModel.UpTotalRole),
+                "downHistory": m.data(idx, NetIfacesModel.DownHistoryRole),
+                "upHistory": m.data(idx, NetIfacesModel.UpHistoryRole)
+            }
+            if (root.isActiveIface(row))
+                out.push(row)
+        }
+        netRows = out
+        let shown = null
+        for (const r of out) {
+            if (r.name === shownIface) {
+                shown = r
+                break
+            }
+        }
+        if (shown === null)
+            shown = out.length > 0 ? out[0] : null
+        shownIface = shown !== null ? shown.name : ""
+        shownRow = shown
+    }
+
+    Connections {
+        target: NetIfacesModel
+        function onModelReset() { root.rebuildNet() }
+    }
+    Connections {
+        target: Settings
+        function onNetHideDockerChanged() { root.rebuildNet() }
+    }
+    Component.onCompleted: root.rebuildNet()
+
     ColumnLayout {
         anchors.fill: parent
         anchors.margins: 10
         spacing: 6
 
-        RowLayout {
+        Label {
+            text: qsTr("Network")
+            font.bold: true
+            font.pixelSize: 14
+            color: Theme.text
             Layout.fillWidth: true
-            Label {
-                text: qsTr("Network")
-                font.bold: true
-                font.pixelSize: 14
-                color: Theme.text
-            }
-            Item { Layout.fillWidth: true }
-            //? iface picker
-            ComboBox {
-                id: ifacePicker
-                font.pixelSize: 10
-                model: ["auto"].concat(NetMonitor.ifaces)
-                displayText: NetMonitor.iface === "" ? qsTr("auto") : NetMonitor.iface
-                onActivated: function (idx) {
-                    const sel = model[idx]
-                    NetMonitor.selectIface(sel === "auto" ? "" : sel)
+        }
+
+        //? One row per active iface: name · ip, down/up rates
+        Repeater {
+            model: root.netRows
+            delegate: RowLayout {
+                id: ifaceRow
+                required property var modelData
+                Layout.fillWidth: true
+                Label {
+                    text: ifaceRow.modelData.name + " · " + (ifaceRow.modelData.ipv4 || ifaceRow.modelData.ipv6)
+                    color: Theme.textFaint
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                    Layout.fillWidth: true
+                }
+                Label {
+                    text: "↓ " + root.fmtRate(ifaceRow.modelData.downSpeed)
+                    color: Theme.accentCpu
+                    font.bold: true
+                    font.pixelSize: 11
+                }
+                Label {
+                    text: "↑ " + root.fmtRate(ifaceRow.modelData.upSpeed)
+                    color: Theme.accentMem
+                    font.bold: true
+                    font.pixelSize: 11
+                    Layout.alignment: Qt.AlignRight
                 }
             }
         }
 
         Label {
-            text: NetMonitor.iface !== ""
-                ? (NetMonitor.connected
-                    ? qsTr("%1 · %2").arg(NetMonitor.iface).arg(NetMonitor.ipv4 || NetMonitor.ipv6 || qsTr("no ip"))
-                    : qsTr("%1 · disconnected").arg(NetMonitor.iface))
-                : qsTr("no interfaces")
+            visible: root.netRows.length === 0
+            text: qsTr("no active interfaces")
             color: Theme.textFaint
             font.pixelSize: 10
-            elide: Text.ElideRight
             Layout.fillWidth: true
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            ColumnLayout {
-                spacing: 0
-                Label { text: qsTr("down"); color: Theme.accentCpu; font.pixelSize: 10 }
-                Label { text: root.fmtRate(NetMonitor.downSpeed); color: Theme.accentCpu; font.bold: true; font.pixelSize: 13 }
-            }
-            Item { Layout.fillWidth: true }
-            ColumnLayout {
-                spacing: 0
-                Label { text: qsTr("up"); color: Theme.accentMem; font.pixelSize: 10; Layout.alignment: Qt.AlignRight }
-                Label { text: root.fmtRate(NetMonitor.upSpeed); color: Theme.accentMem; font.bold: true; font.pixelSize: 13; Layout.alignment: Qt.AlignRight }
-            }
         }
 
         HistoryGraph {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            samples: NetMonitor.downHistory
-            maxValue: Math.max(10240, Math.max(NetMonitor.downSpeed, NetMonitor.upSpeed) * 1.3)
+            samples: root.shownRow !== null ? root.shownRow.downHistory : []
+            maxValue: root.shownRow !== null
+                ? Math.max(10240, Math.max(root.shownRow.downSpeed, root.shownRow.upSpeed) * 1.3)
+                : 10240
             lineColor: "#4fc3f7"
         }
 
         HistoryGraph {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            samples: NetMonitor.upHistory
-            maxValue: Math.max(10240, Math.max(NetMonitor.downSpeed, NetMonitor.upSpeed) * 1.3)
+            samples: root.shownRow !== null ? root.shownRow.upHistory : []
+            maxValue: root.shownRow !== null
+                ? Math.max(10240, Math.max(root.shownRow.downSpeed, root.shownRow.upSpeed) * 1.3)
+                : 10240
             lineColor: "#81c784"
         }
 
         Label {
-            text: qsTr("total %1 ↓ · %2 ↑")
-                .arg(root.fmtBytes(NetMonitor.downTotal))
-                .arg(root.fmtBytes(NetMonitor.upTotal))
+            text: root.shownRow !== null
+                ? qsTr("total %1 ↓ · %2 ↑")
+                    .arg(root.fmtBytes(root.shownRow.downTotal))
+                    .arg(root.fmtBytes(root.shownRow.upTotal))
+                : "—"
             color: Theme.textFaint
             font.pixelSize: 10
         }
